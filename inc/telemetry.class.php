@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -298,30 +298,12 @@ class Telemetry extends CommonGLPI {
    }
 
    /**
-    * Get UUID
-    *
-    * @param string $type UUID type (either instance or registration)
-    *
-    * @return string
-    */
-   private static final function getUuid($type) {
-      $conf = Config::getConfigurationValues('core', [$type . '_uuid']);
-      $uuid = null;
-      if (!isset($conf[$type . '_uuid']) || empty($conf[$type . '_uuid'])) {
-         $uuid = self::generateUuid($type);
-      } else {
-         $uuid = $conf[$type . '_uuid'];
-      }
-      return $uuid;
-   }
-
-   /**
     * Get instance UUID
     *
     * @return string
     */
    public static final function getInstanceUuid() {
-      return self::getUuid('instance');
+      return Config::getUuid('instance');
    }
 
    /**
@@ -330,21 +312,7 @@ class Telemetry extends CommonGLPI {
     * @return string
     */
    public static final function getRegistrationUuid() {
-      return self::getUuid('registration');
-   }
-
-
-   /**
-    * Generates an unique identifier and store it
-    *
-    * @param string $type UUID type (either instance or registration)
-    *
-    * @return string
-    */
-   public static final function generateUuid($type) {
-      $uuid = Toolbox::getRandomString(40);
-      Config::setConfigurationValues('core', [$type . '_uuid' => $uuid]);
-      return $uuid;
+      return Config::getUuid('registration');
    }
 
    /**
@@ -353,7 +321,7 @@ class Telemetry extends CommonGLPI {
     * @return string
     */
    public static final function generateInstanceUuid() {
-      return self::generateUuid('instance');
+      return Config::generateUuid('instance');
    }
 
    /**
@@ -362,7 +330,7 @@ class Telemetry extends CommonGLPI {
     * @return string
     */
    public static final function generateRegistrationUuid() {
-      return self::generateUuid('registration');
+      return Config::generateUuid('registration');
    }
 
 
@@ -382,7 +350,7 @@ class Telemetry extends CommonGLPI {
             $.ajax({
                url:  $(this).attr('href'),
                success: function(data) {
-                  var _elt = $('<div/>');
+                  var _elt = $('<div></div>');
                   _elt.append(data);
                   $('body').append(_elt);
 

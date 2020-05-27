@@ -3,7 +3,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2019 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -118,10 +118,11 @@ switch ($_SERVER['REQUEST_METHOD']) {
       }
 
       // Decode data (should be json)
-      $data = Toolbox::jsonDecode($_POST['impacts'], true);
+      $data = Toolbox::jsonDecode($_UPOST['impacts'], true);
       if (!is_array($data)) {
          Toolbox::throwError(400, "Payload should be an array");
       }
+      $data = Toolbox::addslashes_deep($data);
 
       $readonly = true;
 

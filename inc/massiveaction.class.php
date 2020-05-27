@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -542,6 +542,8 @@ class MassiveAction {
 
             //TRANS: select action 'update' (before doing it)
             $actions[$self_pref.'update'] = _x('button', 'Update');
+
+            $actions[$self_pref.'clone'] = _x('button', 'Clone');
          }
 
          Infocom::getMassiveActionsForItemtype($actions, $itemtype, $is_deleted, $checkitem);
@@ -572,6 +574,17 @@ class MassiveAction {
 
          Document::getMassiveActionsForItemtype($actions, $itemtype, $is_deleted, $checkitem);
          Contract::getMassiveActionsForItemtype($actions, $itemtype, $is_deleted, $checkitem);
+
+         // Amend comment for objects with a 'comment' field
+         $item->getEmpty();
+         if ($canupdate && isset($item->fields['comment'])) {
+            $actions[$self_pref.'amend_comment'] = __("Amend comment");
+         }
+
+         // Add a note for objects with the UPDATENOTE rights
+         if (Session::haveRight($item::$rightname, UPDATENOTE)) {
+            $actions[$self_pref.'add_note'] = __("Add note");
+         }
 
          // Plugin Specific actions
          if (isset($PLUGIN_HOOKS['use_massive_action'])) {
@@ -926,12 +939,59 @@ class MassiveAction {
 
             return true;
 
+         case 'clone':
+            $rand = mt_rand();
+
+            echo "<table width='100%'><tr>";
+            echo "<td>";
+            echo __('How many copies do you want to create ?');
+            echo "</td><tr>";
+            echo "<td>".Html::input("nb_copy", ['id' => "nb_copy$rand", 'value' => 0]);
+            echo "</td>";
+            echo "</tr></table>";
+
+            echo "<br>\n";
+
+            $submitname = _sx('button', 'Post');
+            if (isset($ma->POST['submitname']) && $ma->POST['submitname']) {
+               $submitname= stripslashes($ma->POST['submitname']);
+            }
+            echo Html::submit($submitname, ['name' => 'massiveaction']);
+
+            return true;
+
          case 'add_transfer_list':
             echo _n("Are you sure you want to add this item to transfer list?",
                     "Are you sure you want to add these items to transfer list?",
                     count($ma->items, COUNT_RECURSIVE) - count($ma->items));
             echo "<br><br>";
             echo Html::submit(_x('button', 'Add'), ['name' => 'massiveaction']);
+
+            return true;
+
+         case 'amend_comment':
+            echo __("Amendment to insert");
+            echo ("<br><br>");
+            Html::textarea([
+               'name' => 'amendment'
+            ]);
+            echo ("<br><br>");
+            echo Html::submit(__('Update'), [
+               'name' => 'massiveaction'
+            ]);
+
+            return true;
+
+         case 'add_note':
+            echo __("New Note");
+            echo ("<br><br>");
+            Html::textarea([
+               'name' => 'add_note'
+            ]);
+            echo ("<br><br>");
+            echo Html::submit(_sx('button', 'Add'), [
+               'name' => 'massiveaction'
+            ]);
 
             return true;
       }
@@ -1132,8 +1192,7 @@ class MassiveAction {
             $input     = $ma->POST;
             if (isset($searchopt[$index])) {
                /// Infocoms case
-               if (!isPluginItemType($item->getType())
-                   && Search::isInfocomOption($item->getType(), $index)) {
+               if (Search::isInfocomOption($item->getType(), $index)) {
 
                   $ic               = new Infocom();
                   $link_entity_type = -1;
@@ -1240,6 +1299,34 @@ class MassiveAction {
             }
             break;
 
+         case 'clone':
+            $input = $ma->POST;
+            foreach ($ids as $id) {
+               // check rights
+               if ($item->can($id, CREATE)) {
+                  // recovers the item from DB
+                  if ($item->getFromDB($id)) {
+                     $succeed = true;
+                     // clone in a loop
+                     for ($i = 0; $i < $input["nb_copy"] && $succeed; $i++) {
+                        if ($item->clone() === false) {
+                           $succeed = false;
+                        }
+                     }
+                     if ($succeed) {
+                        $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_OK);
+                     } else {
+                        $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_KO);
+                        $ma->addMessage($item->getErrorMessage(ERROR_ON_ACTION));
+                     }
+                  }
+               } else {
+                  $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_NORIGHT);
+                  $ma->addMessage($item->getErrorMessage(ERROR_RIGHT));
+               }
+            }
+            break;
+
          case 'add_transfer_list' :
             $itemtype = $item->getType();
             if (!isset($_SESSION['glpitransfer_list'])) {
@@ -1255,6 +1342,87 @@ class MassiveAction {
             $ma->setRedirect($CFG_GLPI['root_doc'].'/front/transfer.action.php');
             break;
 
+         case 'amend_comment':
+            $item->getEmpty();
+
+            // Check the itemtype is a valid target
+            if (!array_key_exists('comment', $item->fields)) {
+               $ma->addMessage($item->getErrorMessage(ERROR_COMPAT));
+               break;
+            }
+
+            // Load input
+            $input = $ma->getInput();
+            $amendment = $input['amendment'];
+
+            foreach ($ids as $id) {
+               $item->getFromDB($id);
+
+               // Check rights
+               if (!$item->canUpdateItem()) {
+                  $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_KO);
+                  $ma->addMessage($item->getErrorMessage(ERROR_RIGHT));
+                  continue;
+               }
+
+               $comment = $item->fields['comment'];
+
+               if (is_null($comment) || $comment == "") {
+                  // If the comment was empty, use directly the amendment
+                  $comment = $amendment;
+               } else {
+                  // If there is already a comment, insert some padding then
+                  // the amendment
+                  $comment .= "\n\n$amendment";
+               }
+
+               // Update the comment
+               $success = $item->update([
+                  'id'      => $id,
+                  'comment' => $comment
+               ]);
+
+               if (!$success) {
+                  $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_KO);
+                  $ma->addMessage($item->getErrorMessage(ERROR_ON_ACTION));
+               } else {
+                  $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_OK);
+               }
+
+            }
+            break;
+
+         case 'add_note':
+            // Check rights
+            if (!Session::haveRight($item::$rightname, UPDATENOTE)) {
+               $ma->addMessage($item->getErrorMessage(ERROR_RIGHT));
+               break;
+            }
+
+            // Load input
+            $input = $ma->getInput();
+            $content = $input['add_note'];
+
+            $em = new Notepad();
+
+            foreach ($ids as $id) {
+               $success = $em->add([
+                  'itemtype'             => $item::getType(),
+                  'items_id'             => $id,
+                  'content'              => $content,
+                  'users_id'             => Session::getLoginUserID(),
+                  'users_id_lastupdater' => Session::getLoginUserID(),
+               ]);
+
+               if (!$success) {
+                  $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_KO);
+                  $ma->addMessage($item->getErrorMessage(ERROR_ON_ACTION));
+               } else {
+                  $ma->itemDone($item->getType(), $id, MassiveAction::ACTION_OK);
+               }
+            }
+
+            break;
       }
    }
 

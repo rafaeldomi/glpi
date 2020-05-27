@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -59,7 +59,7 @@ if (!defined('GLPI_ROOT')) {
  *
  * @since 0.84
 **/
-class RSSFeed extends CommonDBVisible {
+class RSSFeed extends CommonDBVisible implements ExtraVisibilityCriteria {
 
    // From CommonDBTM
    public $dohistory                   = true;
@@ -248,7 +248,7 @@ class RSSFeed extends CommonDBVisible {
     *
     * @return array
     */
-   static public function getVisibilityCriteria($forceall = false) {
+   static public function getVisibilityCriteria(bool $forceall = false): array {
       $where = [self::getTable() . '.users_id' => Session::getLoginUserID()];
       $join = [];
 
@@ -876,8 +876,7 @@ class RSSFeed extends CommonDBVisible {
          if (!empty($CFG_GLPI["proxy_user"])) {
             $prx_opt[CURLOPT_HTTPAUTH]     = CURLAUTH_ANYSAFE;
             $prx_opt[CURLOPT_PROXYUSERPWD] = $CFG_GLPI["proxy_user"].":".
-                                             Toolbox::decrypt($CFG_GLPI["proxy_passwd"],
-                                                              GLPIKEY);
+                                             Toolbox::sodiumDecrypt($CFG_GLPI["proxy_passwd"]);
          }
          $feed->set_curl_options($prx_opt);
       }

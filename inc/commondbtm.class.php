@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -159,6 +159,13 @@ class CommonDBTM extends CommonGLPI {
     * @var string[]
     */
    protected static $foreign_key_fields_of = [];
+
+
+   /**
+    * Fields to remove when querying data with api
+    * @var array
+    */
+   static $undisclosedFields = [];
 
    /**
     * Constructor
@@ -421,6 +428,9 @@ class CommonDBTM extends CommonGLPI {
     * @return void
     */
    static public function unsetUndisclosedFields(&$fields) {
+      foreach (static::$undisclosedFields as $key) {
+         unset($fields[$key]);
+      }
    }
 
 
@@ -1046,6 +1056,21 @@ class CommonDBTM extends CommonGLPI {
          return false;
       }
 
+      // This means we are not adding a cloned object
+      if (!isset($input['clone'])) {
+         // This means we are asked to clone the object (old way). This will clone the clone method
+         // that will set the clone parameter to true
+         if (isset($input['_oldID'])) {
+            $id_to_clone = $input['_oldID'];
+         }
+         if (isset($input['id'])) {
+            $id_to_clone = $input['id'];
+         }
+         if (isset($id_to_clone) && $this->getFromDB($id_to_clone)) {
+            return $this->clone($input, $history);
+         }
+      }
+
       // Store input in the object to be available in all sub-method / hook
       $this->input = $input;
 
@@ -1162,6 +1187,49 @@ class CommonDBTM extends CommonGLPI {
       }
 
       return false;
+   }
+
+   /**
+    * Clones the current item
+    *
+    * @since 9.5
+    *
+    * @param array $override_input custom input to override
+    * @param boolean $history do history log ? (true by default)
+    *
+    * @return integer the new ID of the clone (or false if fail)
+    */
+   function clone(array $override_input = [], bool $history = true) {
+      global $DB, $CFG_GLPI;
+
+      if ($DB->isSlave()) {
+         return false;
+      }
+      $new_item = new static();
+      $input = $this->fields;
+      foreach ($override_input as $key => $value) {
+         $input[$key] = $value;
+      }
+      $input = $new_item->prepareInputForClone($input);
+      if (isset($input['id'])) {
+         $input['_oldID'] =  $input['id'];
+         unset($input['id']);
+      }
+      unset($input['date_creation']);
+      unset($input['date_mod']);
+
+      if (isset($input['template_name'])) {
+         unset($input['template_name']);
+      }
+      if (isset($input['is_template'])) {
+         unset($input['is_template']);
+      }
+
+      $input['clone'] = true;
+      $newID = $new_item->add($input, [], $history);
+      // If the item needs post clone (recursive cloning for example)
+      $new_item->post_clone($this, $history);
+      return $newID;
    }
 
 
@@ -1292,6 +1360,19 @@ class CommonDBTM extends CommonGLPI {
       return $input;
    }
 
+    /**
+    * Prepare input datas for cloning the item
+    *
+    * @since 9.5
+    *
+    * @param array $input datas used to add the item
+    *
+    * @return array the modified $input array
+   **/
+   function prepareInputForClone($input) {
+      return $input;
+   }
+
 
    /**
     * Actions done after the ADD of the item in the database
@@ -1299,6 +1380,19 @@ class CommonDBTM extends CommonGLPI {
     * @return void
    **/
    function post_addItem() {
+   }
+
+   /**
+    * Actions done after the clone of the item in the database
+    *
+    * @since 9.5
+    *
+    * @param $source the item that is being cloned
+    * @param $history do history log ?
+    *
+    * @return void
+   **/
+   function post_clone($source, $history) {
    }
 
 
@@ -1451,13 +1545,6 @@ class CommonDBTM extends CommonGLPI {
                QueuedNotification::forceSendFor($this->getType(), $this->fields['id']);
             }
 
-            // Update raw names cache (for API)
-            $GLPI_CACHE->delete(self::getCacheKeyForFriendlyName(
-               $this->getType(),
-               $this->fields['id']
-            ));
-            $this->getFriendlyName();
-
             return true;
          }
       }
@@ -1498,7 +1585,10 @@ class CommonDBTM extends CommonGLPI {
             }
             $query['WHERE'][] = ['OR' => $OR];
 
-            $input = ['entities_id' => $this->getEntityID()];
+            $input = [
+               'entities_id'  => $this->getEntityID(),
+               '_transfer'    => 1
+            ];
             if ($this->maybeRecursive()) {
                $input['is_recursive'] = $this->isRecursive();
             }
@@ -1626,11 +1716,17 @@ class CommonDBTM extends CommonGLPI {
       if (isset($this->input['purge'])) {
          $this->input['_purge'] = $this->input['purge'];
          unset($this->input['purge']);
+      } else if ($force) {
+         $this->input['_purge'] = 1;
+         $this->input['_no_message'] = $this->input['_no_message'] ?? 1;
       }
 
       if (isset($this->input['delete'])) {
          $this->input['_delete'] = $this->input['delete'];
          unset($this->input['delete']);
+      } else if (!$force) {
+         $this->input['_delete'] = 1;
+         $this->input['_no_message'] = $this->input['_no_message'] ?? 1;
       }
 
       if (!isset($this->input['_no_history'])) {
@@ -1816,6 +1912,9 @@ class CommonDBTM extends CommonGLPI {
       if (isset($input['restore'])) {
          $input['_restore'] = $input['restore'];
          unset($input['restore']);
+      } else {
+         $this->input['_restore'] = 1;
+         $this->input['_no_message'] = $this->input['_no_message'] ?? 1;
       }
 
       // Store input in the object to be available in all sub-method / hook
@@ -2424,7 +2523,7 @@ class CommonDBTM extends CommonGLPI {
          echo "<tr class='tab_bg_2'>";
          echo "<td class='right' colspan='".($params['colspan']*2)."'>";
          foreach ($params['addbuttons'] as $key => $val) {
-            echo "<button type='submit' class='vsubmit' name='$key'>
+            echo "<button type='submit' class='vsubmit' name='$key' value='1'>
                   $val
                </button>&nbsp;";
          }
@@ -3775,6 +3874,11 @@ class CommonDBTM extends CommonGLPI {
          MassiveAction::getAddTransferList($actions);
       }
 
+      //massive action to link appliances from possible item types
+      if (in_array(static::getType(), Appliance::getTypes(true)) && static::canUpdate()) {
+         $actions['Appliance'.MassiveAction::CLASS_ACTION_SEPARATOR.'add_item'] = __('Associate to appliance');
+      }
+
       return $actions;
    }
 
@@ -4263,7 +4367,8 @@ class CommonDBTM extends CommonGLPI {
       if (is_array($crit) && (count($crit) > 0)) {
          $crit['FIELDS'] = [$this::getTable() => 'id'];
          $ok = true;
-         foreach ($DB->request($this->getTable(), $crit) as $row) {
+         $iterator = $DB->request($this->getTable(), $crit);
+         foreach ($iterator as $row) {
             if (!$this->delete($row, $force, $history)) {
                $ok = false;
             }
@@ -4988,7 +5093,8 @@ class CommonDBTM extends CommonGLPI {
 
 
    /**
-    * add files (from $this->input['_filename']) to an CommonDBTM object
+    * add files from a textarea (from $this->input['content'])
+    * or a file input (from $this->input['_filename']) to an CommonDBTM object
     * create document if needed
     * create link from document to CommonDBTM object
     *
@@ -4999,6 +5105,7 @@ class CommonDBTM extends CommonGLPI {
     *                        - force_update (default false) update the content field of the object
     *                        - content_field (default content) the field who receive the main text
     *                                                          (with images)
+    *                        - name (default filename) name of the HTML input containing files
     *
     * @return array the input param transformed
    **/
@@ -5007,19 +5114,24 @@ class CommonDBTM extends CommonGLPI {
 
       $default_options = [
          'force_update'  => false,
-         'content_field' => 'content'
+         'content_field' => 'content',
+         'name'          => 'filename',
       ];
       $options = array_merge($default_options, $options);
 
-      if (!isset($input['_filename'])
-          || (count($input['_filename']) == 0)) {
+      $uploadName = '_' . $options['name'];
+      $tagUploadName = '_tag_' . $options['name'];
+      $prefixUploadName = '_prefix_' . $options['name'];
+
+      if (!isset($input[$uploadName])
+          || (count($input[$uploadName]) == 0)) {
          return $input;
       }
       $docadded     = [];
       $donotif      = isset($input['_donotif']) ? $input['_donotif'] : 0;
       $disablenotif = isset($input['_disablenotif']) ? $input['_disablenotif'] : 0;
 
-      foreach ($input['_filename'] as $key => $file) {
+      foreach ($input[$uploadName] as $key => $file) {
          $doc      = new Document();
          $docitem  = new Document_Item();
          $docID    = 0;
@@ -5027,9 +5139,9 @@ class CommonDBTM extends CommonGLPI {
          $input2   = [];
 
          //If file tag is present
-         if (isset($input['_tag_filename'])
-             && !empty($input['_tag_filename'][$key])) {
-            $input['_tag'][$key] = $input['_tag_filename'][$key];
+         if (isset($input[$tagUploadName])
+             && !empty($input[$tagUploadName][$key])) {
+            $input['_tag'][$key] = $input[$tagUploadName][$key];
          }
 
          //retrieve entity
@@ -5077,8 +5189,8 @@ class CommonDBTM extends CommonGLPI {
             $input2["documentcategories_id"]   = $CFG_GLPI["documentcategories_id_forticket"];
             $input2["_only_if_upload_succeed"] = 1;
             $input2["_filename"]               = [$file];
-            if (isset($this->input['_prefix_filename'][$key])) {
-               $input2["_prefix_filename"]  = [$this->input['_prefix_filename'][$key]];
+            if (isset($this->input[$prefixUploadName][$key])) {
+               $input2[$prefixUploadName]  = [$this->input[$prefixUploadName][$key]];
             }
             $docID = $doc->add($input2);
 
@@ -5308,7 +5420,7 @@ class CommonDBTM extends CommonGLPI {
    }
 
    static function getIcon() {
-      return "";
+      return "fas fa-empty-icon";
    }
 
    /**
@@ -5335,17 +5447,9 @@ class CommonDBTM extends CommonGLPI {
     * @return string Friendly name of the object
     */
    public static function getFriendlyNameById($id) {
-      global $GLPI_CACHE;
-
-      $cache_key = self::getCacheKeyForFriendlyName(self::getType(), $id);
-
-      if ($GLPI_CACHE->has($cache_key)) {
-         return $GLPI_CACHE->get($cache_key);
-      } else {
-         $item = new static();
-         $item->getFromDB($id);
-         return $item->getFriendlyName();
-      }
+      $item = new static();
+      $item->getFromDB($id);
+      return $item->getFriendlyName();
    }
 
    /**
@@ -5356,23 +5460,7 @@ class CommonDBTM extends CommonGLPI {
     * @return string
     */
    final public function getFriendlyName() {
-      global $GLPI_CACHE;
-
-      $cache_key = self::getCacheKeyForFriendlyName(
-         self::getType(),
-         $this->getID()
-      );
-
-      if ($GLPI_CACHE->has($cache_key)) {
-         // Get from cache
-         $name = $GLPI_CACHE->get($cache_key);
-      } else {
-         // Compute the name then set the cache
-         $name = $this->computeFriendlyName();
-         $GLPI_CACHE->set($cache_key, $name);
-      }
-
-      return $name;
+      return $this->computeFriendlyName();
    }
 
    /**
@@ -5387,5 +5475,22 @@ class CommonDBTM extends CommonGLPI {
          return $this->fields[static::getNameField()];
       }
       return '';
+   }
+
+   /**
+    * Retrieve an item from the database
+    *
+    * @param integer $ID ID of the item to get
+    *
+    * @return boolean true if succeed else false
+   */
+   public static function getById(int $id) {
+      $item = new static();
+
+      if (!$item->getFromDB($id)) {
+         return false;
+      }
+
+      return $item;
    }
 }

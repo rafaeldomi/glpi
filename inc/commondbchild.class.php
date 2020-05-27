@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -92,6 +92,29 @@ abstract class CommonDBChild extends CommonDBConnexity {
          return $criteria;
       }
       return null;
+   }
+
+   /**
+    * get the request results to get items associated to the given one (defined by $itemtype and $items_id)
+    *
+    * @since 9.5
+    *
+    * @param string  $itemtype          the type of the item we want the resulting items to be associated to
+    * @param string  $items_id          the name of the item we want the resulting items to be associated to
+    *
+    * @return array the items associated to the given one (empty if none was found)
+   **/
+   static function getItemsAssociationRequest($itemtype, $items_id) {
+      global $DB;
+
+      return $DB->request([
+         'SELECT' => 'id',
+         'FROM'   => static::getTable(),
+         'WHERE'  => [
+            static::$itemtype  => $itemtype,
+            static::$items_id  => $items_id
+         ]
+      ]);
    }
 
 

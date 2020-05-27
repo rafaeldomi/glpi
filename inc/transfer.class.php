@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -1105,6 +1105,23 @@ class Transfer extends CommonDBTM {
             // Document : keep / delete + clean unused / keep unused
             if (Document::canApplyOn($itemtype)) {
                $this->transferDocuments($itemtype, $ID, $newID);
+
+               if (is_a($itemtype, CommonITILObject::class, true)) {
+                  // Transfer ITIL childs documents too
+                  $itil_item = getItemForItemtype($itemtype);
+                  $itil_item->getFromDB($ID);
+                  $document_item_obj = new Document_Item();
+                  $document_items = $document_item_obj->find(
+                     $itil_item->getAssociatedDocumentsCriteria(true)
+                  );
+                  foreach ($document_items as $document_item) {
+                     $this->transferDocuments(
+                        $document_item['itemtype'],
+                        $document_item['items_id'],
+                        $document_item['items_id']
+                     );
+                  }
+               }
             }
 
             // Transfer compatible printers
@@ -1118,8 +1135,11 @@ class Transfer extends CommonDBTM {
             }
 
             // Transfer Item
-            $input = ['id'          => $newID,
-                           'entities_id' => $this->to];
+            $input = [
+               'id'          => $newID,
+               'entities_id' => $this->to,
+               '_transfer'   => 1
+            ];
 
             // Manage Location dropdown
             if (isset($item->fields['locations_id'])) {
@@ -2211,7 +2231,7 @@ class Transfer extends CommonDBTM {
                            'items_id'  => $item_ID
                         ]
                      ];
-                     if (count($this->needtobe_transfer['Compputer'])) {
+                     if (count($this->needtobe_transfer['Computer'])) {
                         $comp_criteria['WHERE']['NOT'] = ['computers_id' => $this->needtobe_transfer['Computer']];
                      }
                      $result = $DB->request($comp_criteria)->next();

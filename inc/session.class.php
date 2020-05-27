@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -103,6 +103,7 @@ class Session {
                     && (($auth->user->fields['end_date'] > $_SESSION["glpi_currenttime"])
                         || is_null($auth->user->fields['end_date'])))) {
                $_SESSION["glpiID"]              = $auth->user->fields['id'];
+               $_SESSION["glpifriendlyname"]    = $auth->user->getFriendlyName();
                $_SESSION["glpiname"]            = $auth->user->fields['name'];
                $_SESSION["glpirealname"]        = $auth->user->fields['realname'];
                $_SESSION["glpifirstname"]       = $auth->user->fields['firstname'];
@@ -1165,7 +1166,7 @@ class Session {
 
       if (empty($CURRENTCSRFTOKEN)) {
          do {
-            $CURRENTCSRFTOKEN = md5(uniqid(rand(), true));
+            $CURRENTCSRFTOKEN = bin2hex(random_bytes(32));
          } while ($CURRENTCSRFTOKEN == '');
       }
 
@@ -1395,5 +1396,16 @@ class Session {
     */
    static function mustChangePassword() {
       return array_key_exists('glpi_password_expired', $_SESSION);
+   }
+
+   /**
+    * Get active entity id.
+    *
+    * @since 9.5
+    *
+    * @return int
+    */
+   public static function getActiveEntity() {
+      return $_SESSION['glpiactive_entity'];
    }
 }

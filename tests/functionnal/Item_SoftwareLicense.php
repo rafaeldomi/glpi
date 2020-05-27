@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -180,9 +180,11 @@ class Item_SoftwareLicense extends DbTestCase {
       $source_computer = getItemByTypeName('Computer', '_test_pc21');
       $target_computer = getItemByTypeName('Computer', '_test_pc22');
 
-      $lic_computer = new \Item_SoftwareLicense();
-      $lic_computer->cloneItem('Computer', $source_computer->fields['id'],
-                                   $target_computer->fields['id']);
+      $item_softwareLicenses = \Item_SoftwareLicense::getItemsAssociatedTo($source_computer->getType(), $source_computer->getID());
+      $override_input['items_id'] = $target_computer->getID();
+      foreach ($item_softwareLicenses as $item_softwareLicense) {
+         $item_softwareLicense->clone($override_input);
+      }
 
       $input = [
          'items_id'  => $source_computer->fields['id'],
@@ -238,6 +240,6 @@ class Item_SoftwareLicense extends DbTestCase {
 
       $cSoftwareLicense = new \Item_SoftwareLicense();
       $this->array($cSoftwareLicense->rawSearchOptions())
-         ->hasSize(4);
+         ->hasSize(5);
    }
 }

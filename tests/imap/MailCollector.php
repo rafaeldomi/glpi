@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -114,11 +114,10 @@ class MailCollector extends DbTestCase {
          'is_active' => true
       ];
 
-      $this->array($this->testedInstance->prepareInput($oinput, 'add'))
-         ->isIdenticalTo([
-            'passwd'    => \Toolbox::encrypt($oinput["passwd"], GLPIKEY),
-            'is_active' => true
-         ]);
+      $prepared = $this->testedInstance->prepareInput($oinput, 'add');
+      $this->array($prepared)
+         ->boolean['is_active']->isTrue()
+         ->string['passwd']->isNotEqualTo($oinput['passwd']);
 
       //empty password means no password.
       $oinput = [

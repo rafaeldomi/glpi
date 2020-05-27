@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -31,9 +31,12 @@
  */
 
 use Glpi\Event;
+use Glpi\Mail\Protocol\ProtocolInterface;
 use Glpi\System\RequirementsManager;
+use Laminas\Mail\Storage\AbstractStorage;
 use Monolog\Logger;
 use Mexitek\PHPColors\Color;
+use Psr\Log\InvalidArgumentException;
 
 if (!defined('GLPI_ROOT')) {
    die("Sorry. You can't access this file directly");
@@ -238,7 +241,13 @@ class Toolbox {
     *
     * @return string  encrypted string
    **/
-   static function encrypt($string, $key) {
+   static function encrypt($string, $key = null) {
+      self::deprecated('Use sodiumEncrypt');
+
+      if ($key === null) {
+         $glpikey = new GLPIKey();
+         $key = $glpikey->getLegacyKey();
+      }
 
       $result = '';
       for ($i=0; $i<strlen($string); $i++) {
@@ -250,6 +259,44 @@ class Toolbox {
       return base64_encode($result);
    }
 
+   public static function sodiumEncrypt($content, $key = null) {
+      if ($key === null) {
+         $key = self::getGlpiSecKey();
+      }
+
+      $nonce = random_bytes(SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_NPUBBYTES); // NONCE = Number to be used ONCE, for each message
+      $encrypted = sodium_crypto_aead_xchacha20poly1305_ietf_encrypt(
+         $content,
+         $nonce,
+         $nonce,
+         $key
+      );
+      return base64_encode($nonce . $encrypted);
+   }
+
+   public static function sodiumDecrypt($content, $key = null) {
+      if (empty($content)) {
+         // Avoid sodium exception for blank content. Just return the null/empty value.
+         return $content;
+      }
+      if ($key === null) {
+         $key = self::getGlpiSecKey();
+      }
+
+      $content = base64_decode($content);
+      $nonce = mb_substr($content, 0, SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_NPUBBYTES, '8bit');
+      $ciphertext = mb_substr($content, SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_NPUBBYTES, null, '8bit');
+      $plaintext = sodium_crypto_aead_xchacha20poly1305_ietf_decrypt(
+         $ciphertext,
+         $nonce,
+         $nonce,
+         $key
+      );
+      if (!is_string($plaintext)) {
+         throw new \RuntimeException('Unable to decrypt content');
+      }
+      return $plaintext;
+   }
 
    /**
     * Decrypt a string
@@ -259,7 +306,13 @@ class Toolbox {
     *
     * @return string  decrypted string
    **/
-   static function decrypt($string, $key) {
+   static function decrypt($string, $key = null) {
+      self::deprecated('Use sodiumDecrypt');
+
+      if ($key === null) {
+         $glpikey = new GLPIKey();
+         $key = $glpikey->getLegacyKey();
+      }
 
       $result = '';
       $string = base64_decode($string);
@@ -272,6 +325,18 @@ class Toolbox {
       }
 
       return Toolbox::unclean_cross_side_scripting_deep($result);
+   }
+
+   /**
+    * Get GLPI security key used for decryptable passwords from file
+    *
+    * @throw \RuntimeException if key file is missing
+    *
+    * @return string
+    */
+   public static function getGlpiSecKey() {
+      $glpikey = new GLPIKey();
+      return $glpikey->get();
    }
 
 
@@ -357,7 +422,7 @@ class Toolbox {
          }
 
          $config                      = ['safe'=>1];
-         $config["elements"]          = "*+iframe";
+         $config["elements"]          = "*+iframe+audio+video";
          $config["direct_list_nest"]  = 1;
 
          $value                       = htmLawed($value, $config);
@@ -1307,22 +1372,10 @@ class Toolbox {
    /**
     * Check if new version is available
     *
-    * @param boolean $auto                  check done autically ? (if not display result)
-    * @param boolean $messageafterredirect  use message after redirect instead of display
-    *
-    * @return string explaining the result
+    * @return string
    **/
-   static function checkNewVersionAvailable($auto = true, $messageafterredirect = false) {
+   static function checkNewVersionAvailable() {
       global $CFG_GLPI;
-
-      if (!$auto
-          && !Session::haveRight('backup', Backup::CHECKUPDATE)) {
-         return false;
-      }
-
-      if (!$auto && !$messageafterredirect) {
-         echo "<br>";
-      }
 
       //parse github releases (get last version number)
       $error = "";
@@ -1338,56 +1391,13 @@ class Toolbox {
       $latest_version = array_pop($released_tags);
 
       if (strlen(trim($latest_version)) == 0) {
-         if (!$auto) {
-            if ($messageafterredirect) {
-               Session::addMessageAfterRedirect($error, true, ERROR);
-            } else {
-               echo "<div class='center'>$error</div>";
-            }
-         } else {
-            return $error;
-         }
-
+         return $error;
       } else {
          if (version_compare($CFG_GLPI["version"], $latest_version, '<')) {
             Config::setConfigurationValues('core', ['founded_new_version' => $latest_version]);
-
-            if (!$auto) {
-               if ($messageafterredirect) {
-                  Session::addMessageAfterRedirect(sprintf(__('A new version is available: %s.'),
-                                                           $latest_version));
-                  Session::addMessageAfterRedirect(__('You will find it on the GLPI-PROJECT.org site.'));
-               } else {
-                  echo "<div class='center'>".sprintf(__('A new version is available: %s.'),
-                                                      $latest_version)."</div>";
-                  echo "<div class='center'>".__('You will find it on the GLPI-PROJECT.org site.').
-                       "</div>";
-               }
-
-            } else {
-               if ($messageafterredirect) {
-                  Session::addMessageAfterRedirect(sprintf(__('A new version is available: %s.'),
-                                                           $latest_version));
-               } else {
-                  return sprintf(__('A new version is available: %s.'), $latest_version);
-               }
-            }
-
+            return sprintf(__('A new version is available: %s.'), $latest_version);
          } else {
-            if (!$auto) {
-               if ($messageafterredirect) {
-                  Session::addMessageAfterRedirect(__('You have the latest available version'));
-               } else {
-                  echo "<div class='center'>".__('You have the latest available version')."</div>";
-               }
-
-            } else {
-               if ($messageafterredirect) {
-                  Session::addMessageAfterRedirect(__('You have the latest available version'));
-               } else {
-                  return __('You have the latest available version');
-               }
-            }
+            return __('You have the latest available version');
          }
       }
       return 1;
@@ -1489,7 +1499,7 @@ class Toolbox {
 
       if ($plug = isPluginItemType($itemtype)) {
          /* PluginFooBar => /plugins/foo/front/bar */
-         $dir .= "/plugins/".strtolower($plug['plugin']);
+         $dir.= Plugin::getPhpDir(strtolower($plug['plugin']), false);
          $item = str_replace('\\', '/', strtolower($plug['class']));
 
       } else { // Standard case
@@ -1517,7 +1527,7 @@ class Toolbox {
       $dir = ($full ? $CFG_GLPI['root_doc'] : '');
 
       if ($plug = isPluginItemType($itemtype)) {
-         $dir .=  "/plugins/".strtolower($plug['plugin']);
+         $dir .= Plugin::getPhpDir(strtolower($plug['plugin']), false);
          $item = str_replace('\\', '/', strtolower($plug['class']));
 
       } else { // Standard case
@@ -1666,7 +1676,7 @@ class Toolbox {
          if (!empty($CFG_GLPI["proxy_user"])) {
             $opts += [
                CURLOPT_PROXYAUTH    => CURLAUTH_BASIC,
-               CURLOPT_PROXYUSERPWD => $CFG_GLPI["proxy_user"] . ":" . self::decrypt($CFG_GLPI["proxy_passwd"], GLPIKEY),
+               CURLOPT_PROXYUSERPWD => $CFG_GLPI["proxy_user"] . ":" . self::sodiumDecrypt($CFG_GLPI["proxy_passwd"]),
             ];
          }
 
@@ -1774,9 +1784,11 @@ class Toolbox {
       if (!empty($where)) {
 
          if (Session::getCurrentInterface()) {
-            $decoded_where = rawurldecode($where);
             // redirect to URL : URL must be rawurlencoded
+            $decoded_where = rawurldecode($where);
             $matches = [];
+
+            // redirect to full url -> check if it's based on glpi url
             if (preg_match('@(([^:/].+:)?//[^/]+)(/.+)?@', $decoded_where, $matches)) {
                if ($matches[1] !== $CFG_GLPI['url_base']) {
                   Session::addMessageAfterRedirect('Redirection failed');
@@ -1789,10 +1801,12 @@ class Toolbox {
                   Html::redirect($decoded_where);
                }
             }
-            // Redirect based on GLPI_ROOT : URL must be rawurlencoded
+
+            // Redirect to relative url -> redirect with glpi url to prevent exploits
             if ($decoded_where[0] == '/') {
-               // echo $decoded_where;exit();
-               Html::redirect($CFG_GLPI["root_doc"].$decoded_where);
+               $redirect_to = $CFG_GLPI["url_base"].$decoded_where;
+               //echo $redirect_to; exit();
+               Html::redirect($redirect_to);
             }
 
             $data = explode("_", $where);
@@ -1967,12 +1981,12 @@ class Toolbox {
       }
       $tab['mailbox'] = preg_replace("/.*}/", "", $value);
 
-      $tab['type']    = '';
-      if (strstr($value, "/imap")) {
-         $tab['type'] = 'imap';
-      } else if (strstr($value, "/pop")) {
-         $tab['type'] = 'pop';
-      }
+      // type follows first found "/" and ends on next "/" (or end of server string)
+      // server string is surrounded by "{}" and can be followed by a folder name
+      // i.e. "{mail.domain.org/imap/ssl}INBOX", or "{mail.domain.org/pop}"
+      $type = preg_replace('/^\{[^\/]+\/([^\/]+)(?:\/.+)*\}.*/', '$1', $value);
+      $tab['type'] = in_array($type, array_keys(self::getMailServerProtocols())) ? $type : '';
+
       $tab['ssl'] = false;
       if (strstr($value, "/ssl")) {
          $tab['ssl'] = true;
@@ -2045,11 +2059,11 @@ class Toolbox {
       echo "</td></tr>\n";
 
       echo "<tr class='tab_bg_1'><td>" . __('Connection options') . "</td><td>";
-      $values = [//TRANS: imap_open option see http://www.php.net/manual/en/function.imap-open.php
-                     '/imap' => __('IMAP'),
-                     //TRANS: imap_open option see http://www.php.net/manual/en/function.imap-open.php
-                     '/pop' => __('POP'),];
-
+      $values = [];
+      $protocols = Toolbox::getMailServerProtocols();
+      foreach ($protocols as $key => $params) {
+         $values['/' . $key] = $params['label'];
+      }
       $svalue = (!empty($tab['type'])?'/'.$tab['type']:'');
 
       Dropdown::showFromArray('server_type', $values,
@@ -2198,6 +2212,123 @@ class Toolbox {
       return $out;
    }
 
+   /**
+    * Retuns available mail servers protocols.
+    *
+    * For each returned element:
+    *  - key is type used in connection string;
+    *  - 'label' field is the label to display;
+    *  - 'protocol_class' field is the protocol class to use (see Laminas\Mail\Protocol\Imap | Laminas\Mail\Protocol\Pop3);
+    *  - 'storage_class' field is the storage class to use (see Laminas\Mail\Storage\Imap | Laminas\Mail\Storage\Pop3).
+    *
+    * @return array
+    */
+   private static function getMailServerProtocols(): array {
+      $protocols = [
+         'imap' => [
+            //TRANS: IMAP mail server protocol
+            'label'    => __('IMAP'),
+            'protocol' => 'Laminas\Mail\Protocol\Imap',
+            'storage'  => 'Laminas\Mail\Storage\Imap',
+         ],
+         'pop'  => [
+            //TRANS: POP3 mail server protocol
+            'label'    => __('POP'),
+            'protocol' => 'Laminas\Mail\Protocol\Pop3',
+            'storage'  => 'Laminas\Mail\Storage\Pop3',
+         ]
+      ];
+
+      $additionnal_protocols = Plugin::doHookFunction('mail_server_protocols', []);
+      if (is_array($additionnal_protocols)) {
+         foreach ($additionnal_protocols as $key => $additionnal_protocol) {
+            if (array_key_exists($key, $protocols)) {
+               trigger_error(
+                  sprintf('Protocol "%s" is already defined and cannot be overwritten.', $key),
+                  E_USER_WARNING
+               );
+               continue; // already exists, do not overwrite
+            }
+
+            if (!array_key_exists('label', $additionnal_protocol)
+                || !array_key_exists('protocol', $additionnal_protocol)
+                || !array_key_exists('storage', $additionnal_protocol)) {
+               trigger_error(
+                  sprintf('Invalid specs for protocol "%s".', $key),
+                  E_USER_WARNING
+               );
+               continue;
+            }
+            $protocols[$key] = $additionnal_protocol;
+         }
+      } else {
+         trigger_error(
+            'Invalid value returned by "mail_server_protocols" hook.',
+            E_USER_WARNING
+         );
+      }
+
+      return $protocols;
+   }
+
+   /**
+    * Returns protocol instance for given mail server type.
+    *
+    * Class should implements Glpi\Mail\Protocol\ProtocolInterface
+    * or should be \Laminas\Mail\Protocol\Imap|\Laminas\Mail\Protocol\Pop3 for native protocols.
+    *
+    * @param string $protocol_type
+    *
+    * @return null|\Glpi\Mail\Protocol\ProtocolInterface|\Laminas\Mail\Protocol\Imap|\Laminas\Mail\Protocol\Pop3
+    */
+   public static function getMailServerProtocolInstance(string $protocol_type) {
+      $protocols = self::getMailServerProtocols();
+      if (array_key_exists($protocol_type, $protocols)) {
+         $protocol = $protocols[$protocol_type]['protocol'];
+         if (is_callable($protocol)) {
+            return call_user_func($protocol);
+         } else if (class_exists($protocol)
+             && (is_a($protocol, ProtocolInterface::class, true)
+                 || is_a($protocol, \Laminas\Mail\Protocol\Imap::class, true)
+                 || is_a($protocol, \Laminas\Mail\Protocol\Pop3::class, true))) {
+            return new $protocol();
+         } else {
+            trigger_error(
+               sprintf('Invalid specs for protocol "%s".', $protocol_type),
+               E_USER_WARNING
+            );
+         }
+      }
+      return null;
+   }
+
+   /**
+    * Returns storage instance for given mail server type.
+    *
+    * Class should extends \Laminas\Mail\Storage\AbstractStorage.
+    *
+    * @param string $protocol_type
+    * @param array  $params         Storage constructor params, as defined in AbstractStorage
+    *
+    * @return null|AbstractStorage
+    */
+   public static function getMailServerStorageInstance(string $protocol_type, array $params): ?AbstractStorage {
+      $protocols = self::getMailServerProtocols();
+      if (array_key_exists($protocol_type, $protocols)) {
+         $storage = $protocols[$protocol_type]['storage'];
+         if (is_callable($storage)) {
+            return call_user_func($storage, $params);
+         } else if (class_exists($storage) && is_a($storage, AbstractStorage::class, true)) {
+            return new $storage($params);
+         } else {
+            trigger_error(
+               sprintf('Invalid specs for protocol "%s".', $protocol_type),
+               E_USER_WARNING
+            );
+         }
+      }
+      return null;
+   }
 
    /**
     * @return string[]
@@ -2883,9 +3014,9 @@ class Toolbox {
       switch ($type) {
          case 'js':
             $formats = [
-               0 => 'YYYY MMM DD',
-               1 => 'DD MMM YYYY',
-               2 => 'MMM DD YYYY'
+               0 => 'Y-m-d',
+               1 => 'd-m-Y',
+               2 => 'm-d-Y'
             ];
             break;
          case 'php':
@@ -3190,6 +3321,55 @@ HTML;
 
 
    /**
+    * Get a fixed hex color for a input string
+    * Inpsired by shahonseven/php-color-hash
+    * @since 9.5
+    *
+    * @param string $str
+    *
+    * @return string hex color (ex #FAFAFA)
+    */
+   static function getColorForString(string $str = ""):string {
+      $seed  = 131;
+      $seed2 = 137;
+      $hash  = 0;
+      // Make hash more sensitive for short string like 'a', 'b', 'c'
+      $str .= 'x';
+      $max = intval(9007199254740991 / $seed2);
+
+      // Backport of Javascript function charCodeAt()
+      $getCharCode = function($c) {
+         list(, $ord) = unpack('N', mb_convert_encoding($c, 'UCS-4BE', 'UTF-8'));
+         return $ord;
+      };
+
+      // generate integer hash
+      for ($i = 0, $ilen = mb_strlen($str, 'UTF-8'); $i < $ilen; $i++) {
+         if ($hash > $max) {
+            $hash = intval($hash / $seed2);
+         }
+         $hash = $hash * $seed + $getCharCode(mb_substr($str, $i, 1, 'UTF-8'));
+      }
+
+      //get Hsl
+      $base_L = $base_S = [0.35, 0.5, 0.65];
+      $H = $hash % 359;
+      $hash = intval($hash / 360);
+      $S = $base_S[$hash % count($base_S)];
+      $hash = intval($hash / count($base_S));
+      $L = $base_L[$hash % count($base_L)];
+      $hsl = [
+         'H' => $H,
+         'S' => $S,
+         'L' => $L
+      ];
+
+      // return hex
+      return "#".Color::hslToHex($hsl);
+   }
+
+
+   /**
     * Return a frontground color for a given background color
     * if bg color is light, we'll return dark fg color
     * else a light fg color
@@ -3217,5 +3397,48 @@ HTML;
       }
 
       return "#".$fg_color;
+   }
+
+   /**
+    * Get an HTTP header value
+    *
+    * @since 9.5
+    *
+    * @param string $name
+    *
+    * @return mixed The header value or null if not found
+    */
+   public static function getHeader(string $name) {
+      // Format expected header name
+      $name = "HTTP_" . str_replace("-", "_", strtoupper($name));
+
+      return $_SERVER[$name] ?? null;
+   }
+
+   /**
+    * Check if the given class exist and extends CommonDBTM
+    *
+    * @param string $class
+    * @return bool
+    */
+   public static function isCommonDBTM(string $class): bool {
+      return class_exists($class) && is_subclass_of($class, 'CommonDBTM');
+   }
+
+   /**
+    * Check if the given class exist and implement DeprecatedInterface
+    *
+    * @param string $class
+    * @return bool
+    */
+   public static function isAPIDeprecated(string $class): bool {
+      $deprecated = "Glpi\Api\Deprecated\DeprecatedInterface";
+
+      // Insert namespace if missing
+      if (strpos($class, "Glpi\Api\Deprecated") === false) {
+         $class = "Glpi\Api\Deprecated\\$class";
+      }
+
+      return class_exists($class) && is_a($class, $deprecated, true);
    }
 }

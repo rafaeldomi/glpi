@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -260,6 +260,27 @@ class Notification_NotificationTemplate extends CommonDBRelation {
 
       echo "</table>";
       echo "</div>";
+   }
+
+
+   /**
+    * Form for Notification on Massive action
+   **/
+   static function showFormMassiveAction() {
+
+      echo __('Mode')."<br>";
+      self::dropdownMode(['name' => 'mode', 'multiple' => false]);
+      echo "<br><br>";
+
+      echo NotificationTemplate::getTypeName(1)."<br>";
+      NotificationTemplate::dropdown([
+         'name'       => 'notificationtemplates_id',
+         'value'     => 0,
+         'comment'   => 1,
+      ]);
+      echo "<br><br>";
+
+      echo Html::submit(_x('button', 'Add'), ['name' => 'massiveaction']);
    }
 
 

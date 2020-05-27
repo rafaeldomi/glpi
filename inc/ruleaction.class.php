@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -89,7 +89,7 @@ class RuleAction extends CommonDBChild {
       return _n('Action', 'Actions', $nb);
    }
 
-   public function computeFriendlyName() {
+   protected function computeFriendlyName() {
 
       if ($rule = getItemForItemtype(static::$itemtype)) {
          return Html::clean($rule->getMinimalActionText($this->fields));
@@ -400,6 +400,7 @@ class RuleAction extends CommonDBChild {
                    'send'                => __('Send'),
                    'add_validation'      => __('Send'),
                    'fromuser'            => __('Copy from user'),
+                   'defaultfromuser'     => __('Copy default from user'),
                    'fromitem'            => __('Copy from item')];
    }
 
@@ -490,6 +491,7 @@ class RuleAction extends CommonDBChild {
             break;
 
          case 'fromuser' :
+         case 'defaultfromuser' :
          case 'fromitem' :
             Dropdown::showYesNo("value", $param['value'], 0);
             $display = true;

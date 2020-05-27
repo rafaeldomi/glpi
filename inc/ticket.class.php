@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -850,7 +850,7 @@ class Ticket extends CommonITILObject {
       // Enable impact tab if there is a valid linked item
       foreach ($this->getLinkedItems() as $linkedItem) {
          $class = $linkedItem['itemtype'];
-         if (isset($CFG_GLPI['impact_asset_types'][$class])
+         if (Impact::isEnabled($class)
             && Session::getCurrentInterface() === "central") {
 
             $this->addStandardTab('Impact', $ong, $options);
@@ -863,7 +863,12 @@ class Ticket extends CommonITILObject {
       $this->addStandardTab('ProjectTask_Ticket', $ong, $options);
       $this->addStandardTab('Problem_Ticket', $ong, $options);
       $this->addStandardTab('Change_Ticket', $ong, $options);
-      $this->addStandardTab('Log', $ong, $options);
+
+      if (!(Entity::getUsedConfig('anonymize_support_agents')
+         && Session::getCurrentInterface() == 'helpdesk')
+      ) {
+         $this->addStandardTab('Log', $ong, $options);
+      }
 
       return $ong;
    }
@@ -1182,7 +1187,7 @@ class Ticket extends CommonITILObject {
       }
 
       if (isset($input['content'])) {
-         if (isset($input['_filename'])) {
+         if (isset($input['_filename']) || isset($input['_content'])) {
             $input['_disablenotif'] = true;
          } else {
             $input['_donotadddocs'] = true;
@@ -1393,7 +1398,10 @@ class Ticket extends CommonITILObject {
    function pre_updateInDB() {
 
       if (!$this->isTakeIntoAccountComputationBlocked($this->input)
-          && !$this->isAlreadyTakenIntoAccount() && $this->canTakeIntoAccount()) {
+         && !$this->isAlreadyTakenIntoAccount()
+         && $this->canTakeIntoAccount()
+         && !$this->isNew()
+      ) {
          $this->updates[]                            = "takeintoaccount_delay_stat";
          $this->fields['takeintoaccount_delay_stat'] = $this->computeTakeIntoAccountDelayStat();
       }
@@ -1427,6 +1435,8 @@ class Ticket extends CommonITILObject {
 
    function post_updateItem($history = 1) {
       global $CFG_GLPI;
+
+      parent::post_updateItem($history);
 
       //Action for send_validation rule : do validation before clean
       $this->manageValidationAdd($this->input);
@@ -1646,10 +1656,12 @@ class Ticket extends CommonITILObject {
          if (!is_array($input["_users_id_requester"])
              && $user->getFromDB($input["_users_id_requester"])) {
             $input['users_locations'] = $user->fields['locations_id'];
+            $input['users_default_groups'] = $user->fields['groups_id'];
             $tmprequester = $input["_users_id_requester"];
          } else if (is_array($input["_users_id_requester"]) && ($user_id = reset($input["_users_id_requester"])) !== false) {
             if ($user->getFromDB($user_id)) {
                $input['users_locations'] = $user->fields['locations_id'];
+               $input['users_default_groups'] = $user->fields['groups_id'];
             }
          }
       }
@@ -2263,9 +2275,10 @@ class Ticket extends CommonITILObject {
             ]
          ],
          'WHERE'     => [
-            'glpi_items_tickets.itemtype' => $itemtype,
-            'glpi_items_tickets.items_id' => $items_id,
-            $this->getTable() . '.type'   => $type,
+            'glpi_items_tickets.itemtype'    => $itemtype,
+            'glpi_items_tickets.items_id'    => $items_id,
+            $this->getTable() . '.is_deleted' => 0,
+            $this->getTable() . '.type'      => $type,
             'NOT'                         => [
                $this->getTable() . '.status' => array_merge(
                   $this->getSolvedStatusArray(),
@@ -3539,6 +3552,8 @@ class Ticket extends CommonITILObject {
                                                                              $_SESSION['glpiactive_entity'],
                                                                              '', Ticket::INCIDENT_TYPE),
                               '_right'              => "id",
+                              '_content'            => [],
+                              '_tag_content'        => [],
                               '_filename'           => [],
                               '_tag_filename'       => [],
                               '_tasktemplates_id'   => []];
@@ -3919,14 +3934,35 @@ class Ticket extends CommonITILObject {
          $content = Html::setRichTextContent($content_id, $content, $rand);
 
          echo "<div id='content$rand_text'>";
-         echo "<textarea id='$content_id' name='content' cols='$cols' rows='$rows'
-               " . ($tt->isMandatoryField('content') ? " required='required'" : '') .">".
-                $content."</textarea></div>";
+         $uploads = [];
+         if (isset($options['_content'])) {
+            $uploads['_content'] = $options['_content'];
+            $uploads['_tag_content'] = $options['_tag_content'];
+         }
+         Html::textarea([
+            'name'            => 'content',
+            'filecontainer'   => 'content_info',
+            'editor_id'       => $content_id,
+            'required'        => $tt->isMandatoryField('content'),
+            'cols'            => $cols,
+            'rows'            => $rows,
+            'enable_richtext' => true,
+            'value'           => $content,
+            'uploads'         => $uploads,
+         ]);
+         echo "</div>";
 
          if (!$tt->isHiddenField('_documents_id')) {
-            Html::file(['editor_id' => $content_id,
-                             'showtitle' => false,
-                             'multiple' => true]);
+            if (isset($options['_filename'])) {
+               $uploads['_filename'] = $options['_filename'];
+               $uploads['_tag_filename'] = $options['_tag_filename'];
+            }
+            Html::file([
+               // 'editor_id' => $content_id,
+               'showtitle' => false,
+               'multiple'  => true,
+               'uploads'   => $uploads,
+            ]);
          }
 
          echo "</td></tr>";
@@ -4082,6 +4118,8 @@ class Ticket extends CommonITILObject {
                'type'                      => $type,
                '_documents_id'             => [],
                '_tasktemplates_id'         => [],
+               '_content'                  => [],
+               '_tag_content'              => [],
                '_filename'                 => [],
                '_tag_filename'             => []];
    }
@@ -4343,46 +4381,7 @@ class Ticket extends CommonITILObject {
       $colsize3 = '13';
       $colsize4 = '45';
 
-      if (!$options['template_preview']) {
-         echo "<form method='post' name='form_ticket' enctype='multipart/form-data' action='".
-                Ticket::getFormURL()."'>";
-         if (isset($options['_projecttasks_id'])) {
-            echo "<input type='hidden' name='_projecttasks_id' value='".$options['_projecttasks_id']."'>";
-         }
-         if (isset($this->fields['_tasktemplates_id'])) {
-            foreach ($this->fields['_tasktemplates_id'] as $tasktemplates_id) {
-               echo "<input type='hidden' name='_tasktemplates_id[]' value='$tasktemplates_id'>";
-            }
-         }
-      }
-      echo "<div class='spaced' id='tabsbody'>";
-
-      echo "<table class='tab_cadre_fixe' id='mainformtable'>";
-
-      // Optional line
-      $ismultientities = Session::isMultiEntitiesMode();
-      echo "<tr class='headerRow responsive_hidden'>";
-      echo "<th colspan='4'>";
-
-      if ($ID) {
-         $text = sprintf(__('%1$s - ID %2$d'), $this->getTypeName(1), $ID);
-         if ($ismultientities) {
-            $text = sprintf(__('%1$s (%2$s)'), $text,
-                            Dropdown::getDropdownName('glpi_entities',
-                                                      $this->fields['entities_id']));
-         }
-         echo $text;
-      } else {
-         if ($ismultientities) {
-            printf(__('The ticket will be added in the entity %s'),
-                   Dropdown::getDropdownName("glpi_entities", $this->fields['entities_id']));
-         } else {
-            echo __('New ticket');
-         }
-      }
-      echo "</th></tr>";
-
-      Plugin::doHook("pre_item_form", ['item' => $this, 'options' => &$options]);
+      $this->showFormHeader($options);
 
       echo "<tr class='tab_bg_1'>";
       echo "<th width='$colsize1%'>";
@@ -4400,7 +4399,6 @@ class Ticket extends CommonITILObject {
 
       if ($canupdate) {
          Html::showDateTimeField("date", ['value'      => $date,
-                                          'timestep'   => 1,
                                           'maybeempty' => false,
                                           'required'   => ($tt->isMandatoryField('date') && !$ID)]);
       } else {
@@ -4503,7 +4501,6 @@ class Ticket extends CommonITILObject {
          echo "<th width='$colsize1%'>".__('Resolution date')."</th>";
          echo "<td width='$colsize2%'>";
          Html::showDateTimeField("solvedate", ['value'      => $this->fields["solvedate"],
-                                                    'timestep'   => 1,
                                                     'maybeempty' => false,
                                                     'canedit'    => $canupdate]);
          echo "</td>";
@@ -4511,7 +4508,6 @@ class Ticket extends CommonITILObject {
             echo "<th width='$colsize3%'>".__('Close date')."</th>";
             echo "<td width='$colsize4%'>";
             Html::showDateTimeField("closedate", ['value'      => $this->fields["closedate"],
-                                                       'timestep'   => 1,
                                                        'maybeempty' => false,
                                                        'canedit'    => $canupdate]);
             echo "</td>";
@@ -4874,9 +4870,22 @@ class Ticket extends CommonITILObject {
 
       echo "<div id='content$rand_text'>";
       if ($canupdate || $can_requester) {
-         echo "<textarea id='$content_id' name='content' style='width:100%' rows='$rows'".
-               ($tt->isMandatoryField('content') ? " required='required'" : '') . ">" .
-               $content."</textarea></div>";
+         $uploads = [];
+         if (isset($this->input['_content'])) {
+            $uploads['_content'] = $this->input['_content'];
+            $uploads['_tag_content'] = $this->input['_tag_content'];
+         }
+         Html::textarea([
+            'name'            => 'content',
+            'filecontainer'   => 'content_info',
+            'editor_id'       => $content_id,
+            'required'        => $tt->isMandatoryField('content'),
+            'rows'            => $rows,
+            'enable_richtext' => true,
+            'value'           => $content,
+            'uploads'         => $uploads,
+         ]);
+         echo "</div>";
       } else {
          echo Toolbox::getHtmlToDisplay($content);
       }
@@ -4959,10 +4968,20 @@ class Ticket extends CommonITILObject {
                }
             }
          }
-         Html::file(['filecontainer' => 'fileupload_info_ticket',
-                        'editor_id'     => $content_id,
-                        'showtitle'     => false,
-                        'multiple'     => true]);
+         if (!$tt->isHiddenField('_documents_id')) {
+            $uploads = [];
+            if (isset($this->input['_filename'])) {
+               $uploads['_filename'] = $this->input['_filename'];
+               $uploads['_tag_filename'] = $this->input['_tag_filename'];
+            }
+            Html::file([
+               'filecontainer' => 'fileupload_info_ticket',
+               // 'editor_id'     => $content_id,
+               'showtitle'     => false,
+               'multiple'      => true,
+               'uploads'       => $uploads,
+            ]);
+         }
          echo "</td>";
          echo "</tr>";
       }
@@ -6795,19 +6814,19 @@ class Ticket extends CommonITILObject {
 
       if ($sla->getFromDB($this->fields['slas_id_tto'])) {
          $sla_tto_link = "<a href='".$sla->getLinkURL()."'>
-                          <i class='far fa-clock slt' title='".$sla->getName()."'></i></a>";
+                          <i class='fas fa-stopwatch slt' title='".$sla->getName()."'></i></a>";
       }
       if ($sla->getFromDB($this->fields['slas_id_ttr'])) {
          $sla_ttr_link = "<a href='".$sla->getLinkURL()."'>
-                          <i class='far fa-clock slt' title='".$sla->getName()."'></i></a>";
+                          <i class='fas fa-stopwatch slt' title='".$sla->getName()."'></i></a>";
       }
       if ($ola->getFromDB($this->fields['olas_id_tto'])) {
          $ola_tto_link = "<a href='".$ola->getLinkURL()."'>
-                          <i class='far fa-clock slt' title='".$ola->getName()."'></i></a>";
+                          <i class='fas fa-stopwatch slt' title='".$ola->getName()."'></i></a>";
       }
       if ($ola->getFromDB($this->fields['olas_id_ttr'])) {
          $ola_ttr_link = "<a href='".$ola->getLinkURL()."'>
-                          <i class='far fa-clock slt' title='".$ola->getName()."'></i></a>";
+                          <i class='fas fa-stopwatch slt' title='".$ola->getName()."'></i></a>";
       }
 
       $dates = [

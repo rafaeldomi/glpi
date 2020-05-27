@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -89,6 +89,14 @@ class Item_SoftwareVersion extends CommonDBRelation {
          'name'               => _n('Version', 'Versions', 1),
          'datatype'           => 'dropdown',
          'massiveaction'      => false
+      ];
+
+      $tab[] = [
+         'id'                 => '5',
+         'table'              => $this->getTable(),
+         'field'              => 'itemtype',
+         'name'               => __('Request source'),
+         'datatype'           => 'dropdown'
       ];
 
       return $tab;
@@ -1429,18 +1437,22 @@ class Item_SoftwareVersion extends CommonDBRelation {
    /**
     * Duplicate all software from a computer template to its clone
     *
+    * @deprecated 9.5
+    *
     * @param integer $oldid ID of the computer to clone
     * @param integer $newid ID of the computer cloned
    **/
    static function cloneComputer($oldid, $newid) {
 
-      Toolbox::deprecated('Use cloneItem()');
+      Toolbox::deprecated('Use clone');
       return self::cloneItem('Computer', $oldid, $newid);
    }
 
 
    /**
     * Duplicate all software from a item template to its clone
+    *
+    * @deprecated 9.5
     *
     * @param string  $itemtype Itemtype of the item to clone
     * @param integer $oldid ID of the item to clone
@@ -1449,6 +1461,7 @@ class Item_SoftwareVersion extends CommonDBRelation {
    static function cloneItem($itemtype, $oldid, $newid) {
       global $DB;
 
+      Toolbox::deprecated('Use clone');
       $iterator = $DB->request([
          'FROM'   => 'glpi_items_softwareversions',
          'WHERE'  => [

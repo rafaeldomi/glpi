@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -62,7 +62,7 @@ class NotificationTemplateTranslation extends CommonDBChild {
    }
 
 
-   public function computeFriendlyName() {
+   protected function computeFriendlyName() {
       global $CFG_GLPI;
 
       if ($this->getField('language') != '') {

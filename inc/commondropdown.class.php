@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -46,7 +46,7 @@ abstract class CommonDropdown extends CommonDBTM {
 
    //Menu & navigation
    public $first_level_menu  = "config";
-   public $second_level_menu = "CommonDropdown";
+   public $second_level_menu = "commondropdown";
    public $third_level_menu  = "";
 
    public $display_dropdowntitle  = true;

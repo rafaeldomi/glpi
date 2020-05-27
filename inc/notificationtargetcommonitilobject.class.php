@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -1233,7 +1233,16 @@ abstract class NotificationTargetCommonITILObject extends NotificationTarget {
          foreach ($followups as $followup) {
             $tmp                             = [];
             $tmp['##followup.isprivate##']   = Dropdown::getYesNo($followup['is_private']);
-            $tmp['##followup.author##']      = Html::clean(getUserName($followup['users_id']));
+
+            // Check if the author need to be anonymized
+            if (Entity::getUsedConfig('anonymize_support_agents')
+               && ITILFollowup::getById($followup['id'])->isFromSupportAgent()
+            ) {
+               $tmp['##followup.author##'] = __("Helpdesk");
+            } else {
+               $tmp['##followup.author##'] = Html::clean(getUserName($followup['users_id']));
+            }
+
             $tmp['##followup.requesttype##'] = Dropdown::getDropdownName('glpi_requesttypes',
                                                                          $followup['requesttypes_id']);
             $tmp['##followup.date##']        = Html::convDateTime($followup['date']);
@@ -1287,8 +1296,8 @@ abstract class NotificationTargetCommonITILObject extends NotificationTarget {
                ]
             ],
             'WHERE'     => [
-               'glpi_documents_items.itemtype'  => $item->getType(),
-               'glpi_documents_items.items_id'  => $item->fields['id']
+               $item->getAssociatedDocumentsCriteria(),
+               'timeline_position' => ['>', CommonITILObject::NO_TIMELINE], // skip inlined images
             ]
          ]);
 

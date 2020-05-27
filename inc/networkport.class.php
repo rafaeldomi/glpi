@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -227,6 +227,17 @@ class NetworkPort extends CommonDBChild {
       $this->updateDependencies(!$this->input['_no_history']);
    }
 
+   /**
+   * @see CommonDBTM::post_clone
+   */
+   function post_clone($source, $history) {
+      parent::post_clone($source, $history);
+      $instantiation = $source->getInstantiation();
+      if ($instantiation !== false) {
+         $instantiation->fields[$instantiation->getIndexName()] = $this->getID();
+         return $instantiation->clone([], $history);
+      }
+   }
 
    /**
     * \brief split input fields when validating a port
@@ -395,7 +406,6 @@ class NetworkPort extends CommonDBChild {
    function post_addItem() {
       $this->updateDependencies(!$this->input['_no_history']);
    }
-
 
    function cleanDBonPurge() {
 
@@ -978,7 +988,7 @@ class NetworkPort extends CommonDBChild {
    **/
    function getSpecificMassiveActions($checkitem = null) {
 
-      $isadmin = $checkitem->canUpdate();
+      $isadmin = $checkitem !== null && $checkitem->canUpdate();
       $actions = parent::getSpecificMassiveActions($checkitem);
       if ($isadmin) {
          $vlan_prefix                    = 'NetworkPort_Vlan'.MassiveAction::CLASS_ACTION_SEPARATOR;
@@ -1086,6 +1096,7 @@ class NetworkPort extends CommonDBChild {
    /**
     * Clone the current NetworkPort when the item is clone
     *
+    * @deprecated 9.5
     * @since 0.84
     *
     * @param string  $itemtype      the type of the item that was clone
@@ -1095,6 +1106,7 @@ class NetworkPort extends CommonDBChild {
    static function cloneItem($itemtype, $old_items_id, $new_items_id) {
       global $DB;
 
+      Toolbox::deprecated('Use clone');
       $np = new self();
       // ADD Ports
       $iterator = $DB->request([

@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -85,12 +85,56 @@ class CommonGLPI {
 
 
    /**
+    * Return the simplified localized label of the current Type in the context of a form.
+    * Avoid to recall the type in the label (Computer status -> Status)
+    *
+    * Should be overloaded in each new class
+    *
+    * @return string
+   **/
+   static function getFieldLabel() {
+      return static::getTypeName();
+   }
+
+
+   /**
     * Return the type of the object : class name
     *
     * @return string
    **/
    static function getType() {
       return get_called_class();
+   }
+
+   /**
+    * Check rights on CommonGLPI Object (without corresponding table)
+    * Same signature as CommonDBTM::can but in case of this class, we don't check instance rights
+    * so, id and input parameters are unused.
+    *
+    * @param integer $ID    ID of the item (-1 if new item)
+    * @param mixed   $right Right to check : r / w / recursive / READ / UPDATE / DELETE
+    * @param array   $input array of input data (used for adding item) (default NULL)
+    *
+    * @return boolean
+   **/
+   function can($ID, $right, array &$input = null) {
+      switch ($right) {
+         case READ :
+            return static::canView();
+
+         case UPDATE :
+            return static::canUpdate();
+
+         case DELETE :
+            return static::canDelete();
+
+         case PURGE :
+            return static::canPurge();
+
+         case CREATE :
+            return static::canCreate();
+      }
+      return false;
    }
 
 
@@ -223,6 +267,8 @@ class CommonGLPI {
 
       $ong = [];
       $this->addDefaultFormTab($ong);
+      $this->addImpactTab($ong, $options);
+
       return $ong;
    }
 
@@ -318,7 +364,7 @@ class CommonGLPI {
       global $CFG_GLPI;
 
       // Check if impact analysis is enabled for this item type
-      if (isset($CFG_GLPI['impact_asset_types'][static::class])) {
+      if (Impact::isEnabled(static::class)) {
          $this->addStandardTab('Impact', $ong, $options);
       }
 
@@ -1054,7 +1100,7 @@ class CommonGLPI {
 
                   var current_action = $(this).data('action');
 
-                  $('<div />').dialog({
+                  $('<div></div>').dialog({
                      title: ma.actions[current_action],
                      width: 500,
                      height: 'auto',
@@ -1446,5 +1492,4 @@ class CommonGLPI {
             return sprintf(__('%1$s: %2$s'), $object, __('Item already defined'));
       }
    }
-
 }

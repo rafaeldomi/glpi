@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -39,7 +39,7 @@ if (!defined('GLPI_ROOT')) {
 /**
  * KnowbaseItem Class
 **/
-class KnowbaseItem extends CommonDBVisible {
+class KnowbaseItem extends CommonDBVisible implements ExtraVisibilityCriteria {
 
 
    // From CommonDBTM
@@ -270,13 +270,17 @@ class KnowbaseItem extends CommonDBVisible {
    **/
    function post_addItem() {
 
-      // add documents (and replace inline pictures)
+      // add screenshots
       $this->input = $this->addFiles(
          $this->input, [
             'force_update'  => true,
-            'content_field' => 'answer'
+            'content_field' => 'answer',
+            'name'          => 'answer',
          ]
       );
+
+      // Add documents
+      $this->input = $this->addFiles($this->input, ['force_update' => true]);
 
       if (isset($this->input["_visibility"])
           && isset($this->input["_visibility"]['_type'])
@@ -491,7 +495,7 @@ class KnowbaseItem extends CommonDBVisible {
     *
     * @return array
     */
-   static public function getVisibilityCriteria($forceall = false) {
+   static public function getVisibilityCriteria(bool $forceall = false): array {
       global $CFG_GLPI;
 
       $is_public_faq_context = !Session::getLoginUserID() && $CFG_GLPI["use_public_faq"];
@@ -644,22 +648,32 @@ class KnowbaseItem extends CommonDBVisible {
    }
 
 
-   /**
-    * @see CommonDBTM::prepareInputForUpdate()
-   **/
    function prepareInputForUpdate($input) {
-
-      // add documents (and replace inline pictures)
-      $input = $this->addFiles(
-         $input,
-         ['content_field' => 'answer']
-      );
-
       // set title for question if empty
       if (isset($input["name"]) && empty($input["name"])) {
          $input["name"] = __('New item');
       }
       return $input;
+   }
+
+   function post_updateItem($history = 1) {
+      // Update screenshots
+      $this->input = $this->addFiles(
+         $this->input,
+         [
+            'force_update'  => true,
+            'content_field' => 'answer',
+            'name'          => 'answer',
+         ]
+      );
+
+      // add uploaded documents
+      $this->input = $this->addFiles(
+         $this->input,
+         [
+            'force_update'  => true,
+         ]
+      );
    }
 
 
@@ -791,13 +805,11 @@ class KnowbaseItem extends CommonDBVisible {
       echo "<tr class='tab_bg_1'>";
       echo "<td>".__('Visible since')."</td><td>";
       Html::showDateTimeField("begin_date", ['value'       => $this->fields["begin_date"],
-                                                  'timestep'    => 1,
                                                   'maybeempty' => true,
                                                   'canedit'    => $canedit]);
       echo "</td>";
       echo "<td>".__('Visible until')."</td><td>";
       Html::showDateTimeField("end_date", ['value'       => $this->fields["end_date"],
-                                                'timestep'    => 1,
                                                 'maybeempty' => true,
                                                 'canedit'    => $canedit]);
       echo "</td></tr>";
@@ -1200,10 +1212,11 @@ class KnowbaseItem extends CommonDBVisible {
           && (countElementsInTable('glpi_knowbaseitemtranslations') > 0)) {
          $criteria['LEFT JOIN']['glpi_knowbaseitemtranslations'] = [
             'ON'  => [
-               'glpi_knowbaseitemtranslations'  => 'knowbaseitems_id',
                'glpi_knowbaseitems'             => 'id',
-               'AND'                            => [
-                  'glpi_knowbaseitemtranslations.language' => $_SESSION['glpilanguage']
+               'glpi_knowbaseitemtranslations'  => 'knowbaseitems_id', [
+                  'AND'                            => [
+                     'glpi_knowbaseitemtranslations.language' => $_SESSION['glpilanguage']
+                  ]
                ]
             ]
          ];
@@ -1347,14 +1360,14 @@ class KnowbaseItem extends CommonDBVisible {
                // Add visibility date
                $criteria['WHERE'][] = [
                   'OR'  => [
-                     'glpi_knowbaseitems.begin_date'  => null,
-                     'glpi_knowbaseitems.begin_date'  => ['<', new QueryExpression('NOW()')]
+                     ['glpi_knowbaseitems.begin_date' => null],
+                     ['glpi_knowbaseitems.begin_date' => ['<', new QueryExpression('NOW()')]]
                   ]
                ];
                $criteria['WHERE'][] = [
                   'OR'  => [
-                     'glpi_knowbaseitems.end_date' => null,
-                     'glpi_knowbaseitems.end_date' => ['>', new QueryExpression('NOW()')]
+                     ['glpi_knowbaseitems.end_date' => null],
+                     ['glpi_knowbaseitems.end_date' => ['>', new QueryExpression('NOW()')]]
                   ]
                ];
             }
@@ -1740,9 +1753,10 @@ class KnowbaseItem extends CommonDBVisible {
          $criteria['LEFT JOIN']['glpi_knowbaseitemtranslations'] = [
             'ON'  => [
                'glpi_knowbaseitems'             => 'id',
-               'glpi_knowbaseitemtranslations'  => 'knowbaseitems_id',
-               'AND'                            => [
-                  'glpi_knowbaseitemtranslations.language'  => $_SESSION['glpilanguage']
+               'glpi_knowbaseitemtranslations'  => 'knowbaseitems_id', [
+                  'AND'                            => [
+                     'glpi_knowbaseitemtranslations.language' => $_SESSION['glpilanguage']
+                  ]
                ]
             ]
          ];
@@ -1988,8 +2002,8 @@ class KnowbaseItem extends CommonDBVisible {
 
       $values = [
          'id'     => $this->getID(),
-         'name'   => $revision->fields['name'],
-         'answer' => $revision->fields['answer']
+         'name'   => addslashes($revision->fields['name']),
+         'answer' => addslashes($revision->fields['answer'])
       ];
 
       if ($this->update($values)) {

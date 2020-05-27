@@ -1,6 +1,16 @@
 name: "GLPI CI"
 
-on: ["push"]
+on:
+  # Runs test suite when a new commit is pushed on "master" and "*/bugfixes" branches
+  # and when a new tag is created
+  push:
+    branches:
+      - master
+      - '*/bugfixes'
+    tags:
+       - '*'
+  # Runs test suite when a PR is opened or synchronyzed
+  pull_request:
 
 jobs:
   lint:
@@ -15,7 +25,7 @@ jobs:
           --volume /glpi:/var/glpi
     steps:
       - name: "Checkout"
-        uses: "actions/checkout@v1"
+        uses: "actions/checkout@v2"
       - name: "Deploy source into app container"
         run: |
           sudo cp --no-target-directory --preserve --recursive `pwd` /glpi
@@ -53,6 +63,7 @@ jobs:
           #- "mariadb:10.2"
           #- "mariadb:10.3"
           - "mariadb:10.4"
+          - "mariadb:10.5"
           #- "mysql:5.6"
           #- "mysql:5.7"
           - "mysql:8.0"
@@ -77,7 +88,7 @@ jobs:
         image: "glpi/githubactions-openldap"
     steps:
       - name: "Checkout"
-        uses: "actions/checkout@v1"
+        uses: "actions/checkout@v2"
       - name: "Deploy source into app container"
         run: |
           sudo cp --no-target-directory --preserve --recursive `pwd` /glpi
@@ -133,6 +144,7 @@ jobs:
         run: |
           for f in `ls tests/emails-tests/*.eml`; do cat $f | docker exec --user glpi --interactive ${{ job.services.dovecot.id }} getmail_maildir /home/glpi/Maildir/ ; done
           docker exec ${{ job.services.app.id }} sed -e 's/127.0.0.1/dovecot/g' -i tests/imap/MailCollector.php
+          docker exec ${{ job.services.app.id }} sed -e 's/127.0.0.1/dovecot/g' -i tests/imap/Toolbox.php
           docker exec ${{ job.services.app.id }} vendor/bin/atoum -p 'php -d memory_limit=512M' --debug --force-terminal --use-dot-report --bootstrap-file tests/bootstrap.php --no-code-coverage --max-children-number 1 -d tests/imap
       - name: "WEB tests"
         run: |

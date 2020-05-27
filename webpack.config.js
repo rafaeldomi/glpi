@@ -1,7 +1,7 @@
 /*
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2019 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -85,10 +85,8 @@ var libsConfig = {
                     path.resolve(__dirname, 'node_modules/cytoscape-context-menus'),
                     path.resolve(__dirname, 'node_modules/gridstack'),
                     path.resolve(__dirname, 'node_modules/jquery-migrate'),
-                    path.resolve(__dirname, 'node_modules/jquery-ui-multidatespicker'),
                     path.resolve(__dirname, 'node_modules/jstree'),
                     path.resolve(__dirname, 'node_modules/photoswipe'),
-                    path.resolve(__dirname, 'node_modules/spectrum-colorpicker'),
                     path.resolve(__dirname, 'vendor/blueimp/jquery-file-upload'),
                 ],
                 use: ['script-loader'],
@@ -150,17 +148,20 @@ var libs = {
             from: 'locales/*.js',
         }
     ],
+    'flatpickr': [
+        {
+            context: 'dist',
+            from: 'l10n/*.js',
+        },
+        {
+            context: 'dist',
+            from: 'themes/*.css',
+        }
+    ],
     'jquery-ui': [
         {
             context: 'ui',
             from: 'i18n/*.js',
-        }
-    ],
-    'jquery-ui-timepicker-addon': [
-        {
-            context: 'dist',
-            from: 'i18n/jquery-ui-timepicker-*.js',
-            ignore: ['i18n/jquery-ui-timepicker-addon-i18n{,.min}.js'],
         }
     ],
     'select2': [
@@ -203,10 +204,13 @@ for (let packageName in libs) {
     }
 }
 
-module.exports = (env, argv) => {
+module.exports = function() {
     var configs = [glpiConfig, libsConfig];
 
     for (let config of configs) {
+        config.mode = 'none'; // Force 'none' mode, as optimizations will be done on release process
+        config.devtool = 'source-map'; // Add sourcemap to files
+
         // Limit verbosity to only usefull informations
         config.stats = {
             all: false,
@@ -217,10 +221,6 @@ module.exports = (env, argv) => {
             entrypoints: true,
             timings: true,
         };
-
-        if (argv.mode === 'development') {
-            config.devtool = 'source-map';
-        }
     }
 
     return configs;

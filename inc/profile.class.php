@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -42,13 +42,27 @@ class Profile extends CommonDBTM {
    // Specific ones
 
    /// Helpdesk fields of helpdesk profiles
-   static public $helpdesk_rights = ['create_ticket_on_login', 'followup',
-                                          'knowbase', 'helpdesk_hardware', 'helpdesk_item_type',
-                                          'password_update', 'reminder_public',
-                                          'reservation', 'rssfeed_public',
-                                          'show_group_hardware', 'task', 'ticket',
-                                          'tickettemplates_id', 'ticket_cost',
-                                          'ticketvalidation', 'ticket_status','personalization'];
+   public static $helpdesk_rights = [
+      'create_ticket_on_login',
+      'changetemplates_id',
+      'followup',
+      'helpdesk_hardware',
+      'helpdesk_item_type',
+      'knowbase',
+      'password_update',
+      'personalization',
+      'problemtemplates_id',
+      'reminder_public',
+      'reservation',
+      'rssfeed_public',
+      'show_group_hardware',
+      'task',
+      'ticket',
+      'ticket_cost',
+      'ticket_status',
+      'tickettemplates_id',
+      'ticketvalidation',
+   ];
 
 
    /// Common fields used for all profiles type
@@ -64,6 +78,7 @@ class Profile extends CommonDBTM {
 
       $forbidden   = parent::getForbiddenStandardMassiveAction();
       $forbidden[] = 'update';
+      $forbidden[] = 'clone';
       return $forbidden;
    }
 
@@ -77,6 +92,7 @@ class Profile extends CommonDBTM {
 
       $ong = [];
       $this->addDefaultFormTab($ong);
+      $this->addImpactTab($ong, $options);
       $this->addStandardTab(__CLASS__, $ong, $options);
       $this->addStandardTab('Profile_User', $ong, $options);
       $this->addStandardTab('Log', $ong, $options);
@@ -270,10 +286,10 @@ class Profile extends CommonDBTM {
       }
 
       if (isset($input["_cycle_ticket"])) {
-         $tab   = Ticket::getAllStatusArray();
+         $tab   = array_keys(Ticket::getAllStatusArray());
          $cycle = [];
-         foreach ($tab as $from => $label) {
-            foreach ($tab as $dest => $label) {
+         foreach ($tab as $from) {
+            foreach ($tab as $dest) {
                if (($from != $dest)
                    && (!isset($input["_cycle_ticket"][$from][$dest])
                       || ($input["_cycle_ticket"][$from][$dest] == 0))) {
@@ -385,6 +401,21 @@ class Profile extends CommonDBTM {
             $this->profileRight[$right] = $input[$right];
             unset($input[$right]);
          }
+      }
+
+      // Set default values, only needed for helpdesk
+      $interface = isset($input['interface']) ? $input['interface'] : "";
+      if ($interface == "helpdesk" && !isset($input["_cycle_ticket"])) {
+         $tab   = array_keys(Ticket::getAllStatusArray());
+         $cycle = [];
+         foreach ($tab as $from) {
+            foreach ($tab as $dest) {
+               if ($from != $dest) {
+                  $cycle[$from][$dest] = 0;
+               }
+            }
+         }
+         $input["ticket_status"] = exportArrayToDB($cycle);
       }
 
       return $input;
@@ -938,6 +969,9 @@ class Profile extends CommonDBTM {
                       ['itemtype'  => 'Domain',
                             'label'     => _n('Domain', 'Domains', Session::getPluralNumber()),
                             'field'     => 'domain'],
+                      ['itemtype'  => 'Appliance',
+                            'label'     => Appliance::getTypeName(Session::getPluralNumber()),
+                            'field'     => 'appliance'],
                   ];
       $matrix_options['title'] = __('Management');
       $this->displayRightsChoiceMatrix($rights, $matrix_options);
@@ -1318,7 +1352,7 @@ class Profile extends CommonDBTM {
 
       $allowactions = [Ticket::INCOMING => [],
                             Ticket::SOLVED   => [Ticket::CLOSED],
-                            Ticket::CLOSED   => [Ticket::CLOSED, Ticket::INCOMING]];
+                            Ticket::CLOSED   => [Ticket::INCOMING]];
 
       foreach ($statuses as $index_1 => $status_1) {
          $columns[$index_1] = $status_1;
@@ -1423,9 +1457,6 @@ class Profile extends CommonDBTM {
                       ['itemtype'  => 'QueuedNotification',
                             'label'     => __('Notification queue'),
                             'field'     => 'queuednotification'],
-                      ['itemtype'  => 'Backup',
-                            'label'     => __('Maintenance'),
-                            'field'     => 'backup'],
                       ['itemtype'  => 'Log',
                             'label'     => _n('Log', 'Logs', Session::getPluralNumber()),
                             'field'     => 'logs']];

@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -1749,7 +1749,7 @@ abstract class CommonDBRelation extends CommonDBConnexity {
                'glpi_entities'   => 'id'
             ]
          ];
-         $params['WHERE'] += getEntitiesRestrictCriteria($item->getTable(), '', '', true);
+         $params['WHERE'] += getEntitiesRestrictCriteria($item->getTable(), '', '', 'auto');
          $params['ORDER'] = ['glpi_entities.completename', $params['ORDER']];
       }
 

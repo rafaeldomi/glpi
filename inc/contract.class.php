@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -82,6 +82,7 @@ class Contract extends CommonDBTM {
 
       $ong = [];
       $this->addDefaultFormTab($ong);
+      $this->addImpactTab($ong, $options);
       $this->addStandardTab('ContractCost', $ong, $options);
       $this->addStandardTab('Contract_Supplier', $ong, $options);
       $this->addStandardTab('Contract_Item', $ong, $options);
@@ -97,6 +98,7 @@ class Contract extends CommonDBTM {
    /**
     * Duplicate all contracts from a item template to his clone
     *
+    * @deprecated 9.5
     * @since 9.2
     *
     * @param string $itemtype      itemtype of the item
@@ -106,6 +108,7 @@ class Contract extends CommonDBTM {
    static function cloneItem($itemtype, $oldid, $newid) {
       global $DB;
 
+      Toolbox::deprecated('Use clone');
       $result = $DB->request(
          [
             'FROM'   => Contract_Item::getTable(),
@@ -205,7 +208,17 @@ class Contract extends CommonDBTM {
       echo "<td>";
       Html::autocompletionTextField($this, "num");
       echo "</td>";
-      echo "<td colspan='2'></td></tr>";
+
+      $randDropdown = mt_rand();
+      echo "<td><label for='dropdown_states_id$randDropdown'>".__('Status')."</label></td>";
+      echo "<td>";
+      State::dropdown([
+         'value'     => $this->fields["states_id"],
+         'entity'    => $this->fields["entities_id"],
+         'condition' => ['is_visible_contract' => 1],
+         'rand'      => $randDropdown
+      ]);
+      echo "</td></tr>";
 
       echo "<tr class='tab_bg_1'>";
       echo "<td>".__('Start date')."</td>";
@@ -667,6 +680,15 @@ class Contract extends CommonDBTM {
       ];
 
       $tab[] = [
+         'id'                 => '31',
+         'table'              => 'glpi_states',
+         'field'              => 'completename',
+         'name'               => __('Status'),
+         'datatype'           => 'dropdown',
+         'condition'          => ['is_visible_contract' => 1]
+      ];
+
+      $tab[] = [
          'id'                 => '4',
          'table'              => 'glpi_contracttypes',
          'field'              => 'name',
@@ -1117,7 +1139,7 @@ class Contract extends CommonDBTM {
       echo "<td class='numeric'>".$contract0."</td></tr>";
 
       echo "<tr class='tab_bg_2'>";
-      $options['criteria'][0]['value'] = 0;
+      $options['criteria'][0]['value'] = '>0';
       $options['criteria'][1]['value'] = '<7';
       echo "<td><a href=\"".$CFG_GLPI["root_doc"]."/front/contract.php?".
                  Toolbox::append_params($options, '&amp;')."\">".

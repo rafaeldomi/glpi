@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -292,7 +292,7 @@ class Dashboard extends \CommonDBTM {
     *
     * @return array with [title, key]
     */
-   function clone(): array {
+   function cloneCurrent(): array {
       $this->load();
 
       $this->fields['name'] = sprintf(__('Copy of %s'), $this->fields['name']);

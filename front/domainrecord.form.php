@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -46,7 +46,7 @@ $record = new DomainRecord();
 if (isset($_POST["add"])) {
    $record->check(-1, CREATE, $_POST);
    $newID = $record->add($_POST);
-   if ($_SESSION['glpibackcreated']) {
+   if ($_SESSION['glpibackcreated'] && !isset($_POST['_in_modal'])) {
       Html::redirect($record->getFormURLWithID($newID));
    }
    Html::back();

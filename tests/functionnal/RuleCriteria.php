@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -100,7 +100,7 @@ class RuleCriteria extends DbTestCase {
       $this->integer((int)$criteria_id)->isGreaterThan(0);
 
       $this->boolean($criteria->getFromDB($criteria_id))->isTrue();
-      $this->string($criteria->computeFriendlyName())->isIdenticalTo('SoftwareisMozilla Firefox 52');
+      $this->string($criteria->getFriendlyName())->isIdenticalTo('SoftwareisMozilla Firefox 52');
    }
 
    public function testPost_addItem() {

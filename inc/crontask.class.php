@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -87,6 +87,7 @@ class CronTask extends CommonDBTM{
 
       $ong = [];
       $this->addDefaultFormTab($ong);
+      $this->addImpactTab($ong, $options);
       $this->addStandardTab('CronTaskLog', $ong, $options);
       $this->addStandardTab('Log', $ong, $options);
 
@@ -1686,7 +1687,7 @@ class CronTask extends CommonDBTM{
    **/
    static function cronCheckUpdate($task) {
 
-      $result = Toolbox::checkNewVersionAvailable(1);
+      $result = Toolbox::checkNewVersionAvailable();
       $task->log($result);
 
       return 1;

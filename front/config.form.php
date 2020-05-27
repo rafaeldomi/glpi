@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -32,6 +32,13 @@
 
 include ('../inc/includes.php');
 Session::checkRight("config", READ);
+
+if (isset($_GET['check_version'])) {
+    Session::addMessageAfterRedirect(
+        Toolbox::checkNewVersionAvailable()
+    );
+    Html::back();
+}
 
 $config = new Config();
 $_POST['id'] = 1;

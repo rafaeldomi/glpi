@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -32,6 +32,7 @@
 
 namespace tests\units;
 
+use CommonITILObject;
 use \DbTestCase;
 
 /* Test for inc/ticket.class.php */
@@ -759,7 +760,7 @@ class Ticket extends DbTestCase {
 
       // Opening date, editable
       preg_match(
-         '/.*<input[^>]*name=\'_date\'[^>]*>.*/',
+         '/.*<input[^>]*name=[\'"]date[\'"][^>]*>.*/',
          $output,
          $matches
       );
@@ -767,7 +768,7 @@ class Ticket extends DbTestCase {
 
       // Time to own, editable
       preg_match(
-         '/.*<input[^>]*name=\'_time_to_own\'[^>]*>.*/',
+         '/.*<input[^>]*name=[\'"]time_to_own[\'"][^>]*>.*/',
          $output,
          $matches
       );
@@ -775,7 +776,7 @@ class Ticket extends DbTestCase {
 
       // Internal time to own, editable
       preg_match(
-         '/.*<input[^>]*name=\'_internal_time_to_own\'[^>]*>.*/',
+         '/.*<input[^>]*name=[\'"]internal_time_to_own[\'"][^>]*>.*/',
          $output,
          $matches
       );
@@ -783,7 +784,7 @@ class Ticket extends DbTestCase {
 
       // Time to resolve, editable
       preg_match(
-         '/.*<input[^>]*name=\'_time_to_resolve\'[^>]*>.*/',
+         '/.*<input[^>]*name=[\'"]time_to_resolve[\'"][^>]*>.*/',
          $output,
          $matches
       );
@@ -791,7 +792,7 @@ class Ticket extends DbTestCase {
 
       // Internal time to resolve, editable
       preg_match(
-         '/.*<input[^>]*name=\'_internal_time_to_resolve\'[^>]*>.*/',
+         '/.*<input[^>]*name=[\'"]internal_time_to_resolve[\'"][^>]*>.*/',
          $output,
          $matches
       );
@@ -1385,6 +1386,46 @@ class Ticket extends DbTestCase {
       $this->array($fup->fields)
          ->variable['users_id']->isEqualTo($uid)
          ->variable['users_id_editor']->isEqualTo($uid2);
+   }
+
+   public function testClone() {
+      $this->login();
+      $this->setEntity('Root entity', true);
+      $ticket = new \Ticket();
+      $ticket = getItemByTypeName('Ticket', '_ticket01');
+
+      $date = date('Y-m-d H:i:s');
+      $_SESSION['glpi_currenttime'] = $date;
+
+      // Test item cloning
+      $added = $ticket->clone();
+      $this->integer((int)$added)->isGreaterThan(0);
+
+      $clonedTicket = new \Ticket();
+      $this->boolean($clonedTicket->getFromDB($added))->isTrue();
+
+      $fields = $ticket->fields;
+
+      // Check the ticket values. Id and dates must be different, everything else must be equal
+      foreach ($fields as $k => $v) {
+         switch ($k) {
+            case 'id':
+               $this->variable($clonedTicket->getField($k))->isNotEqualTo($ticket->getField($k));
+               break;
+            case 'date_mod':
+            case 'date_creation':
+               $dateClone = new \DateTime($clonedTicket->getField($k));
+               $expectedDate = new \DateTime($date);
+               $this->dateTime($dateClone)->isEqualTo($expectedDate);
+               break;
+            default:
+               $this->executeOnFailure(
+                  function() use ($k) {
+                      dump($k);
+                  }
+               )->variable($clonedTicket->getField($k))->isEqualTo($ticket->getField($k))->dump($k);
+         }
+      }
    }
 
    protected function _testGetTimelinePosition($tlp, $tickets_id) {
@@ -2029,6 +2070,7 @@ class Ticket extends DbTestCase {
          $input + [
             'name'    => '',
             'content' => 'A ticket to check canTakeIntoAccount() results',
+            'status'  => CommonITILObject::ASSIGNED
          ]
       );
       $this->integer((int)$ticketId)->isGreaterThan(0);
@@ -2871,5 +2913,278 @@ class Ticket extends DbTestCase {
       $this->integer((int)$group_count)->isEqualTo(2);
       // Target ticket should have all suppliers not marked as duplicates above
       $this->integer((int)$supplier_count)->isEqualTo(3);
+   }
+
+   /**
+    * @see self::testGetAssociatedDocumentsCriteria()
+    */
+   protected function getAssociatedDocumentsCriteriaProvider() {
+      $ticket = new \Ticket();
+      $ticket_id = $ticket->add([
+         'name'            => "test",
+         'content'         => "test",
+      ]);
+      $this->integer((int)$ticket_id)->isGreaterThan(0);
+
+      return [
+         [
+            'rights'   => [
+               \Change::$rightname       => 0,
+               \Problem::$rightname      => 0,
+               \Ticket::$rightname       => 0,
+               \ITILFollowup::$rightname => 0,
+               \TicketTask::$rightname   => 0,
+            ],
+            'ticket_id'      => $ticket_id,
+            'bypass_rights'  => false,
+            'expected_where' => sprintf(
+               "(`glpi_documents_items`.`itemtype` = 'Ticket' AND `glpi_documents_items`.`items_id` = '%1\$s')",
+               $ticket_id
+            ),
+         ],
+         [
+            'rights'   => [
+               \Change::$rightname       => 0,
+               \Problem::$rightname      => 0,
+               \Ticket::$rightname       => \READ,
+               \ITILFollowup::$rightname => 0,
+               \TicketTask::$rightname   => 0,
+            ],
+            'ticket_id'      => $ticket_id,
+            'bypass_rights'  => false,
+            'expected_where' => sprintf(
+               "(`glpi_documents_items`.`itemtype` = 'Ticket' AND `glpi_documents_items`.`items_id` = '%1\$s')"
+               . " OR (`glpi_documents_items`.`itemtype` = 'ITILFollowup' AND `glpi_documents_items`.`items_id` IN (SELECT `id` FROM `glpi_itilfollowups` WHERE `glpi_itilfollowups`.`itemtype` = 'Ticket' AND `glpi_itilfollowups`.`items_id` = '%1\$s' AND ((`is_private` = '0' OR `users_id` = '%2\$s'))))"
+               . " OR (`glpi_documents_items`.`itemtype` = 'ITILSolution' AND `glpi_documents_items`.`items_id` IN (SELECT `id` FROM `glpi_itilsolutions` WHERE `glpi_itilsolutions`.`itemtype` = 'Ticket' AND `glpi_itilsolutions`.`items_id` = '%1\$s'))",
+               $ticket_id,
+               getItemByTypeName('User', TU_USER, true)
+            ),
+         ],
+         [
+            'rights'   => [
+               \Change::$rightname       => 0,
+               \Problem::$rightname      => 0,
+               \Ticket::$rightname       => \READ,
+               \ITILFollowup::$rightname => \ITILFollowup::SEEPUBLIC,
+               \TicketTask::$rightname   => \TicketTask::SEEPUBLIC,
+            ],
+            'ticket_id'      => $ticket_id,
+            'bypass_rights'  => false,
+            'expected_where' => sprintf(
+               "(`glpi_documents_items`.`itemtype` = 'Ticket' AND `glpi_documents_items`.`items_id` = '%1\$s')"
+               . " OR (`glpi_documents_items`.`itemtype` = 'ITILFollowup' AND `glpi_documents_items`.`items_id` IN (SELECT `id` FROM `glpi_itilfollowups` WHERE `glpi_itilfollowups`.`itemtype` = 'Ticket' AND `glpi_itilfollowups`.`items_id` = '%1\$s' AND ((`is_private` = '0' OR `users_id` = '%2\$s'))))"
+               . " OR (`glpi_documents_items`.`itemtype` = 'ITILSolution' AND `glpi_documents_items`.`items_id` IN (SELECT `id` FROM `glpi_itilsolutions` WHERE `glpi_itilsolutions`.`itemtype` = 'Ticket' AND `glpi_itilsolutions`.`items_id` = '%1\$s'))"
+               . " OR (`glpi_documents_items`.`itemtype` = 'TicketTask' AND `glpi_documents_items`.`items_id` IN (SELECT `id` FROM `glpi_tickettasks` WHERE `tickets_id` = '%1\$s' AND ((`is_private` = '0' OR `users_id` = '%2\$s'))))",
+               $ticket_id,
+               getItemByTypeName('User', TU_USER, true)
+            ),
+         ],
+         [
+            'rights'   => [
+               \Change::$rightname       => 0,
+               \Problem::$rightname      => 0,
+               \Ticket::$rightname       => \READ,
+               \ITILFollowup::$rightname => \ITILFollowup::SEEPRIVATE,
+               \TicketTask::$rightname   => 0,
+            ],
+            'ticket_id'      => $ticket_id,
+            'bypass_rights'  => false,
+            'expected_where' => sprintf(
+               "(`glpi_documents_items`.`itemtype` = 'Ticket' AND `glpi_documents_items`.`items_id` = '%1\$s')"
+               . " OR (`glpi_documents_items`.`itemtype` = 'ITILFollowup' AND `glpi_documents_items`.`items_id` IN (SELECT `id` FROM `glpi_itilfollowups` WHERE `glpi_itilfollowups`.`itemtype` = 'Ticket' AND `glpi_itilfollowups`.`items_id` = '%1\$s'))"
+               . " OR (`glpi_documents_items`.`itemtype` = 'ITILSolution' AND `glpi_documents_items`.`items_id` IN (SELECT `id` FROM `glpi_itilsolutions` WHERE `glpi_itilsolutions`.`itemtype` = 'Ticket' AND `glpi_itilsolutions`.`items_id` = '%1\$s'))",
+               $ticket_id,
+               getItemByTypeName('User', TU_USER, true)
+            ),
+         ],
+         [
+            'rights'   => [
+               \Change::$rightname       => 0,
+               \Problem::$rightname      => 0,
+               \Ticket::$rightname       => \READ,
+               \ITILFollowup::$rightname => \ITILFollowup::SEEPUBLIC,
+               \TicketTask::$rightname   => \TicketTask::SEEPRIVATE,
+            ],
+            'ticket_id'      => $ticket_id,
+            'bypass_rights'  => false,
+            'expected_where' => sprintf(
+               "(`glpi_documents_items`.`itemtype` = 'Ticket' AND `glpi_documents_items`.`items_id` = '%1\$s')"
+               . " OR (`glpi_documents_items`.`itemtype` = 'ITILFollowup' AND `glpi_documents_items`.`items_id` IN (SELECT `id` FROM `glpi_itilfollowups` WHERE `glpi_itilfollowups`.`itemtype` = 'Ticket' AND `glpi_itilfollowups`.`items_id` = '%1\$s' AND ((`is_private` = '0' OR `users_id` = '%2\$s'))))"
+               . " OR (`glpi_documents_items`.`itemtype` = 'ITILSolution' AND `glpi_documents_items`.`items_id` IN (SELECT `id` FROM `glpi_itilsolutions` WHERE `glpi_itilsolutions`.`itemtype` = 'Ticket' AND `glpi_itilsolutions`.`items_id` = '%1\$s'))"
+               . " OR (`glpi_documents_items`.`itemtype` = 'TicketTask' AND `glpi_documents_items`.`items_id` IN (SELECT `id` FROM `glpi_tickettasks` WHERE `tickets_id` = '%1\$s'))",
+               $ticket_id,
+               getItemByTypeName('User', TU_USER, true)
+            ),
+         ],
+      ];
+   }
+
+   /**
+    * @dataProvider getAssociatedDocumentsCriteriaProvider
+    */
+   public function testGetAssociatedDocumentsCriteria($rights, $ticket_id, $bypass_rights, $expected_where) {
+      $this->login();
+
+      $ticket = new \Ticket();
+      $this->boolean($ticket->getFromDB($ticket_id))->isTrue();
+
+      $session_backup = $_SESSION['glpiactiveprofile'];
+      foreach ($rights as $rightname => $rightvalue) {
+         $_SESSION['glpiactiveprofile'][$rightname] = $rightvalue;
+      }
+      $crit = $ticket->getAssociatedDocumentsCriteria($bypass_rights);
+      $_SESSION['glpiactiveprofile'] = $session_backup;
+
+      $it = new \DBmysqlIterator(null);
+      $it->execute('glpi_tickets', $crit);
+      $this->string($it->getSql())->isIdenticalTo('SELECT * FROM `glpi_tickets` WHERE (' . $expected_where . ')');
+   }
+
+   public function testKeepScreenshotsOnFormReload() {
+      //login to get session
+      $auth = new \Auth();
+      $this->boolean($auth->login(TU_USER, TU_PASS, true))->isTrue();
+
+      $base64Image = base64_encode(file_get_contents(__DIR__ . '/../fixtures/uploads/foo.png'));
+
+      // Test display of saved inputs from a previous submit
+      $_SESSION['saveInput'][\Ticket::class] = [
+         'content' => '&lt;p&gt; &lt;/p&gt;&lt;p&gt;&lt;img id="3e29dffe-0237ea21-5e5e7034b1d1a1.77230247"'
+         . ' src="data:image/png;base64,' . $base64Image . '" width="12" height="12" /&gt;&lt;/p&gt;',
+      ];
+
+      $this->output(
+         function () {
+            $instance = new \Ticket();
+            $instance->showForm('-1');
+         }
+      )->contains('src="data:image/png;base64,' . $base64Image . '"');
+   }
+
+   public function testScreenshotConvertedIntoDocument() {
+      // Test uploads for item creation
+      $base64Image = base64_encode(file_get_contents(__DIR__ . '/../fixtures/uploads/foo.png'));
+      $filename = '5e5e92ffd9bd91.11111111image_paste22222222.png';
+      $instance = new \Ticket();
+      $input = [
+         'name'    => 'a ticket',
+         'content' => '&lt;p&gt; &lt;/p&gt;&lt;p&gt;&lt;img id="3e29dffe-0237ea21-5e5e7034b1d1a1.00000000"'
+         . ' src="data:image/png;base64,' . $base64Image . '" width="12" height="12" /&gt;&lt;/p&gt;',
+         '_content' => [
+            $filename,
+         ],
+         '_tag_content' => [
+            '3e29dffe-0237ea21-5e5e7034b1d1a1.00000000',
+         ],
+         '_prefix_content' => [
+            '5e5e92ffd9bd91.11111111',
+         ]
+      ];
+      copy(__DIR__ . '/../fixtures/uploads/foo.png', GLPI_TMP_DIR . '/' . $filename);
+      $instance->add($input);
+      $expected = 'a href=&quot;/front/document.send.php?docid=';
+      $this->string($instance->fields['content'])->contains($expected);
+
+      // Test uploads for item update
+      $base64Image = base64_encode(file_get_contents(__DIR__ . '/../fixtures/uploads/bar.png'));
+      $filename = '5e5e92ffd9bd91.44444444image_paste55555555.png';
+      copy(__DIR__ . '/../fixtures/uploads/bar.png', GLPI_TMP_DIR . '/' . $filename);
+      $instance->update([
+         'id' => $instance->getID(),
+         'content' => '&lt;p&gt; &lt;/p&gt;&lt;p&gt;&lt;img id="3e29dffe-0237ea21-5e5e7034b1d1a1.33333333"'
+         . ' src="data:image/png;base64,' . $base64Image . '" width="12" height="12" /&gt;&lt;/p&gt;',
+         '_content' => [
+            $filename,
+         ],
+         '_tag_content' => [
+            '3e29dffe-0237ea21-5e5e7034b1d1a1.33333333',
+         ],
+         '_prefix_content' => [
+            '5e5e92ffd9bd91.44444444',
+         ]
+      ]);
+      $expected = 'a href=&quot;/front/document.send.php?docid=';
+      $this->string($instance->fields['content'])->contains($expected);
+   }
+
+   public function testUploadDocuments() {
+      // Test uploads for item creation
+      $filename = '5e5e92ffd9bd91.11111111' . 'foo.txt';
+      $instance = new \Ticket();
+      $input = [
+         'name'    => 'a ticket',
+         'content' => 'testUploadDocuments',
+         '_filename' => [
+            $filename,
+         ],
+         '_tag_filename' => [
+            '3e29dffe-0237ea21-5e5e7034b1ffff.00000000',
+         ],
+         '_prefix_filename' => [
+            '5e5e92ffd9bd91.11111111',
+         ]
+      ];
+      copy(__DIR__ . '/../fixtures/uploads/foo.txt', GLPI_TMP_DIR . '/' . $filename);
+      $instance->add($input);
+      $this->string($instance->fields['content'])->contains('testUploadDocuments');
+      $count = (new \DBUtils())->countElementsInTable(\Document_Item::getTable(), [
+         'itemtype' => 'Ticket',
+         'items_id' => $instance->getID(),
+      ]);
+      $this->integer($count)->isEqualTo(1);
+
+      // Test uploads for item update (adds a 2nd document)
+      $filename = '5e5e92ffd9bd91.44444444bar.txt';
+      copy(__DIR__ . '/../fixtures/uploads/bar.txt', GLPI_TMP_DIR . '/' . $filename);
+      $instance->update([
+         'id' => $instance->getID(),
+         'content' => 'update testUploadDocuments',
+         '_filename' => [
+            $filename,
+         ],
+         '_tag_filename' => [
+            '3e29dffe-0237ea21-5e5e7034b1d1a1.33333333',
+         ],
+         '_prefix_filename' => [
+            '5e5e92ffd9bd91.44444444',
+         ]
+      ]);
+      $this->string($instance->fields['content'])->contains('update testUploadDocuments');
+      $count = (new \DBUtils())->countElementsInTable(\Document_Item::getTable(), [
+         'itemtype' => 'Ticket',
+         'items_id' => $instance->getID(),
+      ]);
+      $this->integer($count)->isEqualTo(2);
+   }
+
+   public function testKeepScreenshotFromTemplate() {
+      //login to get session
+      $auth = new \Auth();
+      $this->boolean($auth->login(TU_USER, TU_PASS, true))->isTrue();
+
+      // create a template with a predeined description
+      $ticketTemplate = new \TicketTemplate();
+      $ticketTemplate->add([
+         'name' => $this->getUniqueString(),
+      ]);
+      $base64Image = base64_encode(file_get_contents(__DIR__ . '/../fixtures/uploads/foo.png'));
+      $content = '&lt;p&gt;&lt;img id="3e29dffe-0237ea21-5e57d2c8895d55.57735524"'
+      . ' src="data:image/png;base64,' . $base64Image . '" width="12" height="12" /&gt;&lt;/p&gt;';
+      $predefinedField = new \TicketTemplatePredefinedField();
+      $predefinedField->add([
+         'tickettemplates_id' => $ticketTemplate->getID(),
+         'num' => '21',
+         'value' => $content
+      ]);
+      $session_tpl_id_back = $_SESSION['glpiactiveprofile']['tickettemplates_id'];
+      $_SESSION['glpiactiveprofile']['tickettemplates_id'] = $ticketTemplate->getID();
+
+      $this->output(
+         function () use ($session_tpl_id_back) {
+            $instance = new \Ticket();
+            $instance->showForm('0');
+            $_SESSION['glpiactiveprofile']['tickettemplates_id'] = $session_tpl_id_back;
+         }
+      )->contains('src="data:image/png;base64,' . $base64Image . '"');
    }
 }

@@ -7,7 +7,7 @@ if (!defined('GLPI_ROOT')) {
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -1075,7 +1075,7 @@ JAVASCRIPT;
       return $input;
    }
 
-   public function computeFriendlyName() {
+   protected function computeFriendlyName() {
       $rack = new Rack();
       $rack->getFromDB($this->fields['racks_id']);
       $name = sprintf(

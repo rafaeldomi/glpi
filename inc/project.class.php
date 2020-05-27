@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -39,7 +39,7 @@ if (!defined('GLPI_ROOT')) {
  *
  * @since 0.85
 **/
-class Project extends CommonDBTM {
+class Project extends CommonDBTM implements ExtraVisibilityCriteria {
    use Kanban;
 
    // From CommonDBTM
@@ -173,6 +173,7 @@ class Project extends CommonDBTM {
 
       $ong = [];
       $this->addDefaultFormTab($ong);
+      $this->addImpactTab($ong, $options);
       $this->addStandardTab('ProjectTask', $ong, $options);
       $this->addStandardTab('ProjectTeam', $ong, $options);
       $this->addStandardTab(__CLASS__, $ong, $options);
@@ -265,35 +266,40 @@ class Project extends CommonDBTM {
       }
    }
 
+   function post_clone($source, $history) {
+      parent::post_clone($source, $history);
+      $relations_classes = [
+         ProjectCost::class,
+         ProjectTask::class,
+         Document_Item::class,
+         ProjectTeam::class,
+         Itil_Project::class,
+         Contract_Item::class,
+         Notepad::class,
+         KnowbaseItem_Item::class
+      ];
+
+      $override_input['items_id'] = $this->getID();
+      foreach ($relations_classes as $classname) {
+         if (!is_a($classname, CommonDBConnexity::class, true)) {
+            Toolbox::logWarning(
+               sprintf(
+                  'Unable to clone elements of class %s as it does not extends "CommonDBConnexity"',
+                  $classname
+               )
+            );
+            continue;
+         }
+
+         $relation_items = $classname::getItemsAssociatedTo($this->getType(), $source->getID());
+         foreach ($relation_items as $relation_item) {
+            $newId = $relation_item->clone($override_input, $history);
+         }
+      }
+   }
 
    function post_addItem() {
       global $CFG_GLPI;
-
-      // Manage add from template
-      if (isset($this->input["_oldID"])) {
-         ProjectCost::cloneProject($this->input["_oldID"], $this->fields['id']);
-
-         // ADD Task
-         ProjectTask::cloneProjectTask($this->input["_oldID"], $this->fields['id']);
-
-         // ADD Documents
-         Document_Item::cloneItem($this->getType(), $this->input["_oldID"], $this->fields['id']);
-
-         // ADD Team
-         ProjectTeam::cloneProjectTeam($this->input["_oldID"], $this->fields['id']);
-
-         // ADD Itil
-         Itil_Project::cloneItilProject($this->input["_oldID"], $this->fields['id']);
-
-         // ADD Contract
-         Contract::cloneItem($this->getType(), $this->input["_oldID"], $this->fields['id']);
-
-         // ADD Notepad
-         Notepad::cloneItem($this->getType(), $this->input["_oldID"], $this->fields['id']);
-
-         //Add KB links
-         KnowbaseItem_Item::cloneItem($this->getType(), $this->input["_oldID"], $this->fields['id']);
-      }
 
       // Update parent percent_done
       if (isset($this->fields['projects_id']) && $this->fields['projects_id'] > 0) {
@@ -378,7 +384,7 @@ class Project extends CommonDBTM {
     *
     * @return array
     */
-   static public function getVisibilityCriteria($forceall = false) {
+   static public function getVisibilityCriteria(bool $forceall = false): array {
       if (Session::haveRight('project', self::READALL)) {
          return [
             'LEFT JOIN' => [],
@@ -1440,7 +1446,6 @@ class Project extends CommonDBTM {
          $date = $_SESSION['glpi_currenttime'];
       }
       Html::showDateTimeField("date", ['value'      => $date,
-                                            'timestep'   => 1,
                                             'maybeempty' => false]);
       echo "</td>";
       if ($ID) {

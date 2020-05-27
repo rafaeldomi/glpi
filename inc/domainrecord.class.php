@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -35,8 +35,6 @@ if (!defined('GLPI_ROOT')) {
 }
 
 class DomainRecord extends CommonDBChild {
-   const STATUS_ACTIVE = 1;
-   const STATUS_DISABLED = 0;
    const DEFAULT_TTL = 3600;
 
    static $rightname              = 'domain';
@@ -113,15 +111,6 @@ class DomainRecord extends CommonDBChild {
       ];
 
       $tab[] = [
-         'id'                 => '5',
-         'table'              => $this->getTable(),
-         'field'              => 'status',
-         'name'               => __('Status'),
-         'searchtype'         => 'equals',
-         'datatype'           => 'specific'
-      ];
-
-      $tab[] = [
          'id'                 => '6',
          'table'              => 'glpi_users',
          'field'              => 'name',
@@ -179,6 +168,21 @@ class DomainRecord extends CommonDBChild {
       return count($_SESSION['glpiactiveprofile']['managed_domainrecordtypes']);
    }
 
+   static function canCreate() {
+      if (count($_SESSION['glpiactiveprofile']['managed_domainrecordtypes'])) {
+         return true;
+      }
+      return parent::canCreate();
+   }
+
+   static function canUpdate() {
+      if (count($_SESSION['glpiactiveprofile']['managed_domainrecordtypes'])) {
+         return true;
+      }
+      return parent::canUpdate();
+   }
+
+
    public function canUpdateItem() {
       return parent::canUpdateItem()
          && ($_SESSION['glpiactiveprofile']['managed_domainrecordtypes'] == [-1]
@@ -215,22 +219,29 @@ class DomainRecord extends CommonDBChild {
     * @return aray|false
     */
    private function prepareInput($input, $add = false) {
-      if (isset($input['date_creation']) && empty($input['date_creation'])) {
-         $input['date_creation'] = 'NULL';
-      }
-      if (isset($input['date_expiration']) && empty($input['date_expiration'])) {
-         $input['date_expiration'] = 'NULL';
+
+      if ($add) {
+         if (isset($input['date_creation']) && empty($input['date_creation'])) {
+            $input['date_creation'] = 'NULL';
+         }
+
+         if (!isset($input['ttl']) || empty($input['ttl'])) {
+            $input['ttl'] = self::DEFAULT_TTL;
+         }
       }
 
-      if (!isset($input['ttl']) || empty($input['ttl'])) {
-         $input['ttl'] = self::DEFAULT_TTL;
+      //search entity
+      if ($add && !isset($input['entities_id'])) {
+         $input['entities_id'] = $_SESSION['glpiactive_entity'] ?? 0;
+         $input['is_recursive'] = $_SESSION['glpiactive_entity_recursive'] ?? 0;
+         $domain = new Domain();
+         if (isset($input['domains_id']) && $domain->getFromDB($input['domains_id'])) {
+            $input['entities_id'] = $domain->fields['entities_id'];
+            $input['is_recursive'] = $domain->fields['is_recursive'];
+         }
       }
 
-      if (!isset($input['status']) || empty($input['status'])) {
-         $input['status'] = self::STATUS_ACTIVE;
-      }
-
-      if (isset($input['domainrecordtypes_id']) ||isset($this->fields['domainrecordtypes_id'])) {
+      if (!Session::isCron() && (isset($input['domainrecordtypes_id']) || isset($this->fields['domainrecordtypes_id']))) {
          if (!($_SESSION['glpiactiveprofile']['managed_domainrecordtypes'] == [-1])) {
             if (isset($input['domainrecordtypes_id']) && !(in_array($input['domainrecordtypes_id'], $_SESSION['glpiactiveprofile']['managed_domainrecordtypes']))) {
                //no right to use selected type
@@ -322,22 +333,6 @@ class DomainRecord extends CommonDBChild {
       echo "</tr>";
 
       echo "<tr class='tab_bg_1'>";
-      echo "<td>" . __('Status') . "</td>";
-      echo "<td>";
-      Dropdown::showFromArray(
-         'status',
-         $this->statusList(), [
-            'value' => $this->fields['status']
-         ]
-      );
-      echo "</td>";
-      echo "<td>" . __('TTL') . "</td>";
-      echo "<td>";
-      echo "<input type='number' name='ttl' value='{$this->fields['ttl']}'/>";
-      echo "</td>";
-      echo "</tr>";
-
-      echo "<tr class='tab_bg_1'>";
       echo "<td>" . __('Technician in charge') . "</td><td>";
       User::dropdown(['name'   => "users_id_tech",
                            'value'  => $this->fields["users_id_tech"],
@@ -355,6 +350,13 @@ class DomainRecord extends CommonDBChild {
       echo "</tr>";
 
       echo "<tr class='tab_bg_1'>";
+      echo "<td>" . __('TTL') . "</td>";
+      echo "<td>";
+      echo "<input type='number' name='ttl' value='{$this->fields['ttl']}'/>";
+      echo "</td>";
+      echo "</tr>";
+
+      echo "<tr class='tab_bg_1'>";
       echo "<td>";
       echo __('Comments') . "</td>";
       echo "<td colspan='3' class='center'>";
@@ -363,6 +365,9 @@ class DomainRecord extends CommonDBChild {
 
       echo "</tr>";
 
+      if (isset($_REQUEST['_in_modal'])) {
+         echo "<input type='hidden' name='_in_modal' value='1'>";
+      }
       $this->showFormButtons($options);
 
       return true;
@@ -382,12 +387,22 @@ class DomainRecord extends CommonDBChild {
       if (!$domain->can($instID, READ)) {
          return false;
       }
-      $canedit = $domain->can($instID, UPDATE);
+      $canedit = $domain->can($instID, UPDATE) || count($_SESSION['glpiactiveprofile']['managed_domainrecordtypes']);
       $rand    = mt_rand();
 
       $iterator = $DB->request([
-         'FROM'      => self::getTable(),
+         'SELECT'    => 'record.*',
+         'FROM'      => self::getTable() . ' AS record',
          'WHERE'     => ['domains_id' => $instID],
+         'LEFT JOIN' => [
+            DomainRecordType::getTable() . ' AS rtype'  => [
+               'ON'  => [
+                  'rtype'  => 'id',
+                  'record' => 'domainrecordtypes_id'
+               ]
+            ]
+         ],
+         'ORDER'     => ['rtype.name ASC', 'record.name ASC']
       ]);
 
       $number = count($iterator);
@@ -429,7 +444,7 @@ class DomainRecord extends CommonDBChild {
          echo Ajax::createIframeModalWindow(
             'add_dropdowndomainrecords_id',
             DomainRecord::getFormURL() . "?domains_id=$instID",
-            ['display' => false]
+            ['display' => false, 'reloadonclose' => true]
          );
 
          echo "</td><td class='center' class='tab_bg_1'>";
@@ -447,6 +462,14 @@ class DomainRecord extends CommonDBChild {
          $massiveactionparams = [];
          Html::showMassiveActions($massiveactionparams);
       }
+      if ($number) {
+         Session::initNavigateListItems(
+            'DomainRecord',
+            //TRANS : %1$s is the itemtype name,
+            //        %2$s is the name of the item (used for headings of a list)
+            sprintf(__('%1$s = %2$s'),
+            Domain::getTypeName(1), $domain->getName()));
+      }
       echo "<table class='tab_cadre_fixe'>";
       echo "<tr>";
 
@@ -461,7 +484,8 @@ class DomainRecord extends CommonDBChild {
       echo "</tr>";
 
       while ($data = $iterator->next()) {
-         Session::initNavigateListItems('DomainRecord', Domain::getTypeName(2) . " = " . $domain->fields['name']);
+         Session::addToNavigateListItems('DomainRecord', $data['id']);
+         Session::addToNavigateListItems('Domain', $domain->fields['id']);
 
          $ID = "";
 
@@ -471,7 +495,7 @@ class DomainRecord extends CommonDBChild {
 
          $link = Toolbox::getItemTypeFormURL('DomainRecord');
          $name = "<a href=\"" . $link . "?id=" . $data["id"] . "\">"
-                  . $data["name"] . "$ID</a>";
+                  . self::getDisplayName($domain, $data['name']) . "$ID</a>";
 
          echo "<tr class='tab_bg_1'>";
 
@@ -497,48 +521,19 @@ class DomainRecord extends CommonDBChild {
       echo "</div>";
    }
 
-   static function getSpecificValueToDisplay($field, $values, array $options = []) {
-
-      if (!is_array($values)) {
-         $values = [$field => $values];
+   public static function getDisplayName(Domain $domain, $name) {
+      $name_txt = rtrim(
+         str_replace(
+            rtrim($domain->getCanonicalName(), '.'),
+            '',
+            $name
+         ),
+         '.'
+      );
+      if (empty($name_txt)) {
+         //dns root
+         $name_txt = '@';
       }
-      switch ($field) {
-         case 'status':
-            return self::getStatus($values[$field]);
-      }
-      return parent::getSpecificValueToDisplay($field, $values, $options);
-   }
-
-   static function getSpecificValueToSelect($field, $name = '', $values = '', array $options = []) {
-      if (!is_array($values)) {
-         $values = [$field => $values];
-      }
-      $options['display'] = false;
-
-      switch ($field) {
-         case 'status' :
-            $options['name']  = $name;
-            $options['value'] = $values[$field];
-            Dropdown::showFromArray(
-               $name,
-               self::statusList(), [
-                  'name'     => 'status',
-                  'showtype' => 'normal',
-                  'display'  => true
-               ]
-            );
-      }
-      return parent::getSpecificValueToSelect($field, $name, $values, $options);
-   }
-
-   public static function getStatus($value) {
-      return self::statusList()[$value] ?? self::STATUS_DISABLED;
-   }
-
-   public static function statusList() {
-      return [
-         self::STATUS_DISABLED   => __('Disabled'),
-         self::STATUS_ACTIVE     => __('Active')
-      ];
+      return $name_txt;
    }
 }

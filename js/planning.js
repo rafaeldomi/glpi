@@ -19,6 +19,7 @@ var GLPIPlanning  = {
          plugins: ['dayGrid', 'interaction', 'list', 'timeGrid', 'resourceTimeline', 'rrule'],
          license_key: "",
          resources: [],
+         now: null,
          rand: '',
          header: {
             left:   'prev,next,today',
@@ -61,6 +62,7 @@ var GLPIPlanning  = {
          editable: true, // we can drag / resize items
          droppable: false, // we cant drop external items by default
          nowIndicator: true,
+         now: options.now,// as we set the calendar as UTC, we need to reprecise the current datetime
          listDayAltFormat: false,
          agendaEventMinHeight: 13,
          header: options.header,
@@ -184,7 +186,11 @@ var GLPIPlanning  = {
             if (!disable_qtip) {
                // detect ideal position
                var qtip_position = {
-                  viewport: 'auto'
+                  target: 'mouse',
+                  adjust: {
+                     mouse: false
+                  },
+                  viewport: $(window)
                };
                if (view.type.indexOf('list') >= 0) {
                   // on central, we want the tooltip on the anchor
@@ -227,12 +233,22 @@ var GLPIPlanning  = {
                loaded = true;
             }
 
+            // attach button (planning and refresh) in planning header
+            $('#'+GLPIPlanning.dom_id+' .fc-toolbar .fc-center h2')
+               .after(
+                  $('<i id="refresh_planning" class="fa fa-sync pointer"></i>')
+               ).after(
+                  $('<div id="planning_datepicker"><a data-toggle><i class="far fa-calendar-alt fa-lg pointer"></i></a>')
+               );
+
             // specific process for full list
             if (view.type == 'listFull') {
                // hide datepick on full list (which have virtually no limit)
-               $('#planning_datepicker')
-                  .datepicker('destroy')
-                  .hide();
+               if ($('#planning_datepicker').length > 0
+                   && "_flatpickr" in $('#planning_datepicker')[0]) {
+                  $('#planning_datepicker')[0]._flatpickr.destroy();
+               }
+               $('#planning_datepicker').hide();
 
                // hide control buttons
                $('#planning .fc-left .fc-button-group').hide();
@@ -250,11 +266,6 @@ var GLPIPlanning  = {
          },
          viewSkeletonRender: function(info) {
             var view_type = info.view.type;
-
-            // forece refetch events when view changed (avoid to do it on initial render)
-            if (GLPIPlanning.last_view !== null) {
-               GLPIPlanning.refresh();
-            }
 
             GLPIPlanning.last_view = view_type;
             // inform backend we changed view (to store it in session)
@@ -430,7 +441,7 @@ var GLPIPlanning  = {
             var editable = event.extendedProps._editable; // do not know why editable property is not available
             if (ajaxurl && editable && !disable_edit) {
                info.jsEvent.preventDefault(); // don't let the browser navigate
-               $('<div>')
+               $('<div></div>')
                   .dialog({
                      modal:  true,
                      width:  'auto',
@@ -468,7 +479,7 @@ var GLPIPlanning  = {
 
             var start = info.start;
             var end = info.end;
-            $('<div>').dialog({
+            $('<div></div>').dialog({
                modal:  true,
                width:  'auto',
                height: 'auto',
@@ -525,14 +536,6 @@ var GLPIPlanning  = {
 
       //window.calendar = calendar; // Required as object is not accessible by forms callback
       GLPIPlanning.calendar.render();
-
-      // attach button (planning and refresh) in planning header
-      $('#'+GLPIPlanning.dom_id+' .fc-toolbar .fc-center h2')
-         .after(
-            $('<i id="refresh_planning" class="fa fa-sync pointer"></i>')
-         ).after(
-            $('<input type="hidden" id="planning_datepicker">')
-         );
 
       $('#refresh_planning').click(function() {
          GLPIPlanning.refresh();
@@ -617,7 +620,7 @@ var GLPIPlanning  = {
       $('#planning_filter a.planning_add_filter' ).on( 'click', function( e ) {
          e.preventDefault(); // to prevent change of url on anchor
          var url = $(this).attr('href');
-         $('<div>').dialog({
+         $('<div></div>').dialog({
             modal: true,
             open: function () {
                $(this).load(url);
@@ -721,7 +724,7 @@ var GLPIPlanning  = {
             });
          });
 
-      $('#planning_filter .color_input input').on('change', function(e, color) {
+      $('#planning_filter .color_input input').on('change', function() {
          var current_li = $(this).parents('li');
          var parent_name = null;
          if (current_li.length >= 1) {
@@ -736,7 +739,7 @@ var GLPIPlanning  = {
                name:   current_li.attr('event_name'),
                type:   current_li.attr('event_type'),
                parent: parent_name,
-               color:  color.toHexString()
+               color: $(this).val()
             },
             success: function() {
                GLPIPlanning.refresh();
@@ -827,20 +830,12 @@ var GLPIPlanning  = {
 
    // datepicker for planning
    initFCDatePicker: function(currentDate) {
-      $('#planning_datepicker').datepicker({
-         changeMonth:     true,
-         changeYear:      true,
-         numberOfMonths:  3,
-         showOn:          'button',
-         buttonText:      '<i class="far fa-calendar-alt"></i>',
-         dateFormat:      'DD, d MM, yy',
-         onSelect: function() {
-            var selected_date = $(this).datepicker('getDate');
-            GLPIPlanning.calendar.gotoDate(selected_date);
+      $('#planning_datepicker').flatpickr({
+         defaultDate: currentDate,
+         onChange: function(selected_date) {
+            GLPIPlanning.calendar.gotoDate(selected_date[0]);
          }
-      }).next('.ui-datepicker-trigger').addClass('pointer');
-
-      $('#planning_datepicker').datepicker('setDate', currentDate);
+      });
    },
 
    // set planning height

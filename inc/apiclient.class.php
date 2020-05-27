@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -44,6 +44,10 @@ class APIClient extends CommonDBTM {
 
    // From CommonDBTM
    public $dohistory                   = true;
+
+   static $undisclosedFields = [
+      'app_token'
+   ];
 
    static function canCreate() {
       return Session::haveRight(static::$rightname, UPDATE);

@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -181,7 +181,11 @@ class SoftwareLicense extends CommonTreeDropdown {
       }
 
       // Add infocoms if exists for the licence
-      Infocom::cloneItem('Software', $dupid, $this->fields['id'], $this->getType());
+      $infocoms = Infocom::getItemsAssociatedTo($this->getType(), $this->fields['id']);
+      if (!empty($infocoms)) {
+         $override_input['items_id'] = $this->getID();
+         $infocoms[0]->clone($override_input);
+      }
       Software::updateValidityIndicator($this->fields["softwares_id"]);
    }
 
@@ -224,6 +228,7 @@ class SoftwareLicense extends CommonTreeDropdown {
 
       $ong = [];
       $this->addDefaultFormTab($ong);
+      $this->addImpactTab($ong, $options);
       $this->addStandardTab('SoftwareLicense', $ong, $options);
       $this->addStandardTab('Item_SoftwareLicense', $ong, $options);
       $this->addStandardTab('Infocom', $ong, $options);

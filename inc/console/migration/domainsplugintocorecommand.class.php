@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -467,7 +467,7 @@ class DomainsPluginToCoreCommand extends AbstractCommand {
             );
 
             $mapped_type = $this->getCorrespondingItem('PluginDomainsDomaintype', $dom['plugin_domains_domaintypes_id']);
-            if ($mapped_type === null) {
+            if ($dom['plugin_domains_domaintypes_id'] != 0 && $mapped_type === null) {
                $message = sprintf(
                   __('Unable to find mapping for type %s.'),
                   $dom['plugin_domains_domaintypes_id']
@@ -524,6 +524,30 @@ class DomainsPluginToCoreCommand extends AbstractCommand {
                'Domain',
                $new_did ?? $core_dom
             );
+
+            //handle infocoms
+            $infocom = new \Infocom();
+            $infocom_input = [
+               'itemtype'     => 'Domain',
+               'items_id'     => $new_did ?? $core_dom,
+               'suppliers_id' => $dom['suppliers_id'],
+               'entities_id'  => $dom['entities_id'],
+               'is_recursive' => $dom['is_recursive']
+            ];
+            if ($core_dom === null) {
+               $infocom->add($infocom_input);
+            } else {
+               $found = $infocom->getFromDBByCrit([
+                  'itemtype'  => 'Domain',
+                  'items_id'  => $core_dom
+               ]);
+               if ($found) {
+                  $infocom_input['id'] = $infocom->fields['id'];
+                  $infocom->update($infocom_input);
+               } else {
+                  $infocom->add($infocom_input);
+               }
+            }
          }
 
          $progress_bar->finish();

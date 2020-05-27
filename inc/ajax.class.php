@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -83,7 +83,7 @@ class Ajax {
       if (!empty($param['container'])) {
          $out .= Html::jsGetElementbyID(Html::cleanId($param['container']));
       } else {
-         $out .= "$('<div />')";
+         $out .= "$('<div></div>')";
       }
       $out .= ".dialog({\n
          width:".$param['width'].",\n
@@ -439,7 +439,7 @@ class Ajax {
                   var newIndex = tabs.index(ui.tab);
                   $.get(
                      '".$CFG_GLPI['root_doc']."/ajax/updatecurrenttab.php',
-                     { itemtype: '$type', id: '$ID', tab: newIndex }
+                     { itemtype: '".addslashes($type)."', id: '$ID', tab: newIndex }
                   );
                }
             },

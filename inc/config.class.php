@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -107,6 +107,7 @@ class Config extends CommonDBTM {
 
       $ong = [];
       $this->addStandardTab(__CLASS__, $ong, $options);
+      $this->addStandardTab('GLPINetwork', $ong, $options);
       $this->addStandardTab('Log', $ong, $options);
 
       return $ong;
@@ -155,7 +156,7 @@ class Config extends CommonDBTM {
          if (empty($input["smtp_passwd"])) {
             unset($input["smtp_passwd"]);
          } else {
-            $input["smtp_passwd"] = Toolbox::encrypt(stripslashes($input["smtp_passwd"]), GLPIKEY);
+            $input["smtp_passwd"] = Toolbox::sodiumEncrypt(stripslashes($input["smtp_passwd"]));
          }
       }
 
@@ -167,8 +168,7 @@ class Config extends CommonDBTM {
          if (empty($input["proxy_passwd"])) {
             unset($input["proxy_passwd"]);
          } else {
-            $input["proxy_passwd"] = Toolbox::encrypt(stripslashes($input["proxy_passwd"]),
-                                                      GLPIKEY);
+            $input["proxy_passwd"] = Toolbox::sodiumEncrypt(stripslashes($input["proxy_passwd"]));
          }
       }
 
@@ -238,6 +238,10 @@ class Config extends CommonDBTM {
       if (isset( $input['lock_use_lock_item'])) {
           $input['lock_item_list'] = exportArrayToDB((isset($input['lock_item_list'])
                                                       ? $input['lock_item_list'] : []));
+      }
+
+      if (isset($input[Impact::CONF_ENABLED])) {
+         $input[Impact::CONF_ENABLED] = exportArrayToDB($input[Impact::CONF_ENABLED]);
       }
 
       // Beware : with new management system, we must update each value
@@ -1834,6 +1838,9 @@ class Config extends CommonDBTM {
 
       echo "<table class='tab_cadre_fixe'>";
       echo "<tr><th>". __('Information about system installation and configuration')."</th></tr>";
+      echo "<tr class='tab_bg_1'><td>";
+      echo "<a class='vsubmit' href='?check_version'>".__('Check if a new version is available')."</a>";
+      echo "</td></tr>";
 
        $oldlang = $_SESSION['glpilanguage'];
        // Keep this, for some function call which still use translation (ex showAllReplicateDelay)
@@ -1888,7 +1895,7 @@ class Config extends CommonDBTM {
       echo wordwrap($msg."\n", $width, "\n\t");
 
       if (isset($_SERVER["HTTP_USER_AGENT"])) {
-         echo "\t" . $_SERVER["HTTP_USER_AGENT"] . "\n";
+         echo "\t" . Toolbox::clean_cross_side_scripting_deep($_SERVER["HTTP_USER_AGENT"]) . "\n";
       }
 
       foreach ($DB->getInfo() as $key => $val) {
@@ -1915,6 +1922,15 @@ class Config extends CommonDBTM {
          echo "\n";
       }
 
+      echo "\n</pre></td></tr>";
+
+      echo "<tr><th>GLPI constants</th></tr>\n";
+      echo "<tr class='tab_bg_1'><td><pre>\n&nbsp;\n";
+      foreach (get_defined_constants() as $constant_name => $constant_value) {
+         if (preg_match('/^GLPI_/', $constant_name)) {
+            echo $constant_name . ': ' . $constant_value . "\n";
+         }
+      }
       echo "\n</pre></td></tr>";
 
       self::showLibrariesInformation();
@@ -2043,6 +2059,12 @@ class Config extends CommonDBTM {
                  'check'   => 'Psr\\SimpleCache\\CacheInterface' ],
                [ 'name'    => 'mexitek/phpcolors',
                  'check'   => 'Mexitek\\PHPColors\\Color' ],
+               [ 'name'    => 'guzzlehttp/guzzle',
+                 'check'   => 'GuzzleHttp\\Client' ],
+               [ 'name'    => 'wapmorgan/unified-archive',
+                 'check'   => 'wapmorgan\\UnifiedArchive\\UnifiedArchive' ],
+               [ 'name'    => 'paragonie/sodium_compat',
+                 'check'   => 'ParagonIE_Sodium_Compat' ],
       ];
       if (Toolbox::canUseCAS()) {
          $deps[] = [
@@ -2220,6 +2242,7 @@ class Config extends CommonDBTM {
                $tabs[10] = __('Security');
                $tabs[7]  = __('Performance');
                $tabs[8]  = __('API');
+               $tabs[11] = Impact::getTypeName();
             }
 
             if (DBConnection::isDBSlaveActive()
@@ -2227,6 +2250,12 @@ class Config extends CommonDBTM {
                $tabs[6]  = _n('SQL replica', 'SQL replicas', Session::getPluralNumber());  // Slave
             }
             return $tabs;
+
+         case 'GLPINetwork':
+            return __('GLPI Network');
+
+         case Impact::getType():
+            return Impact::getTypeName();
       }
       return '';
    }
@@ -2290,6 +2319,9 @@ class Config extends CommonDBTM {
                $item->showFormSecurity();
                break;
 
+            case 11:
+               Impact::showConfigForm();
+               break;
          }
       }
       return true;
@@ -2503,6 +2535,9 @@ class Config extends CommonDBTM {
             ],
             'intl' => [
                'required' => true
+            ],
+            'sodium' => [
+               'required' => false
             ]
          ];
       } else {
@@ -3756,5 +3791,36 @@ class Config extends CommonDBTM {
 
    static function getIcon() {
       return "fas fa-cog";
+   }
+
+   /**
+    * Get UUID
+    *
+    * @param string $type UUID type (e.g. 'instance' or 'registration')
+    *
+    * @return string
+    */
+   public static final function getUuid($type) {
+      $conf = self::getConfigurationValues('core', [$type . '_uuid']);
+      $uuid = null;
+      if (!isset($conf[$type . '_uuid']) || empty($conf[$type . '_uuid'])) {
+         $uuid = self::generateUuid($type);
+      } else {
+         $uuid = $conf[$type . '_uuid'];
+      }
+      return $uuid;
+   }
+
+   /**
+    * Generates an unique identifier and store it
+    *
+    * @param string $type UUID type (e.g. 'instance' or 'registration')
+    *
+    * @return string
+    */
+   public static final function generateUuid($type) {
+      $uuid = Toolbox::getRandomString(40);
+      self::setConfigurationValues('core', [$type . '_uuid' => $uuid]);
+      return $uuid;
    }
 }

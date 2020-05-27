@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -179,7 +179,7 @@ class CommonDBTM extends DbTestCase {
 
       $this->boolean($comp->getEmpty())->isTrue();
       $this->array($comp->fields)
-         ->string['entities_id']->isIdenticalTo('');
+         ->integer['entities_id']->isIdenticalTo($_SESSION["glpiactive_entity"]);
 
       $_SESSION["glpiactive_entity"] = 12;
       $this->boolean($comp->getEmpty())->isTrue();

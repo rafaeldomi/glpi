@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -37,6 +37,14 @@ define('GLPI_ROOT', __DIR__ . '/../');
 define('GLPI_CONFIG_DIR', __DIR__);
 define('GLPI_VAR_DIR', __DIR__ . '/files');
 define('GLPI_URI', (getenv('GLPI_URI') ?: 'http://localhost:8088'));
+
+define(
+   'PLUGINS_DIRECTORIES',
+   [
+      GLPI_ROOT . '/plugins',
+      GLPI_ROOT . '/tests/fixtures/plugins',
+   ]
+);
 
 define('TU_USER', '_test_user');
 define('TU_PASS', 'PhpUnit_4');
@@ -84,7 +92,7 @@ class GlpitestSQLError extends Exception
 }
 
 function loadDataset() {
-   global $CFG_GLPI;
+   global $CFG_GLPI, $DB;
 
    // Unit test data definition
    $data = [
@@ -562,6 +570,13 @@ function loadDataset() {
             'itemtype'                 => 'Profile',
             'items_id'                 => 3,
          ]
+      ], 'Plugin' => [
+         [
+            'directory'    => 'tester',
+            'name'         => 'tester',
+            'version'      => '1.0.0',
+            'state'        => 1,
+         ]
       ],
    ];
 
@@ -569,9 +584,12 @@ function loadDataset() {
    $_SESSION['glpishowallentities'] = 1;
    $_SESSION['glpicronuserrunning'] = "cron_phpunit";
    $_SESSION['glpi_use_mode']       = Session::NORMAL_MODE;
+   $_SESSION['glpiactive_entity']   = 0;
    $_SESSION['glpiactiveentities']  = [0];
    $_SESSION['glpiactiveentities_string'] = "'0'";
    $CFG_GLPI['root_doc']            = '/glpi';
+
+   $DB->beginTransaction();
 
    // need to set theses in DB, because tests for API use http call and this bootstrap file is not called
    Config::setConfigurationValues('core', ['url_base'     => GLPI_URI,
@@ -632,6 +650,7 @@ function loadDataset() {
       echo "\nDone\n\n";
       Config::setConfigurationValues('phpunit', ['dataset' => $data['_version']]);
    }
+   $DB->commit();
 }
 
 /**

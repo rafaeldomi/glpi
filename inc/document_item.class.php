@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -288,6 +288,7 @@ class Document_Item extends CommonDBRelation{
    /**
     * Duplicate documents from an item template to its clone
     *
+    * @deprecated 9.5
     * @since 0.84
     *
     * @param string  $itemtype     itemtype of the item
@@ -298,6 +299,7 @@ class Document_Item extends CommonDBRelation{
    static function cloneItem($itemtype, $oldid, $newid, $newitemtype = '') {
       global $DB;
 
+      Toolbox::deprecated('Use clone');
       if (empty($newitemtype)) {
          $newitemtype = $itemtype;
       }
@@ -412,8 +414,22 @@ class Document_Item extends CommonDBRelation{
             }
 
             while ($data = $iterator->next()) {
-               if ($itemtype == 'Ticket') {
-                  $data["name"] = sprintf(__('%1$s: %2$s'), __('Ticket'), $data["id"]);
+               if ($item instanceof ITILFollowup || $item instanceof ITILSolution) {
+                  $itemtype = $data['itemtype'];
+                  $item = new $itemtype();
+                  $item->getFromDB($data['items_id']);
+                  $data['id'] = $item->fields['id'];
+                  $data['entity'] = $item->fields['entities_id'];
+               } else if ($item instanceof CommonITILTask) {
+                  $itemtype = $item->getItilObjectItemType();
+                  $item = new $itemtype();
+                  $item->getFromDB($data[$item->getForeignKeyField()]);
+                  $data['id'] = $item->fields['id'];
+                  $data['entity'] = $item->fields['entities_id'];
+               }
+
+               if ($item instanceof CommonITILObject) {
+                  $data["name"] = sprintf(__('%1$s: %2$s'), $item->getTypeName(1), $data["id"]);
                }
 
                if ($itemtype == 'SoftwareLicense') {

@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -31,6 +31,10 @@
 */
 
 namespace tests\units;
+
+use Glpi\Api\Deprecated\TicketFollowup;
+use ITILFollowup;
+use Ticket;
 
 /* Test for inc/toolbox.class.php */
 
@@ -347,18 +351,31 @@ class Toolbox extends \GLPITestCase {
       ];
    }
 
-   /**
-    * @dataProvider encryptProvider
-    */
-   public function testEncrypt($string, $key, $expected) {
-      $this->string(\Toolbox::encrypt($string, $key))->isIdenticalTo($expected);
+   protected function sodiumEncryptProvider() {
+      return [
+         ['My string'],
+         ['keepmysecret'],
+         ['This is a strng I want to crypt, with some unusual chars like %, \', @, and so on!']
+      ];
    }
 
    /**
-    * @dataProvider encryptProvider
+    * @dataProvider sodiumEncryptProvider
     */
-   public function testDecrypt($expected, $key, $string) {
-      $this->string(\Toolbox::decrypt($string, $key))->isIdenticalTo($expected);
+   public function testSodiumEncrypt($string) {
+      $crypted = \Toolbox::sodiumEncrypt($string);
+      $this->string($crypted)->isNotEmpty();
+      $this->string(\Toolbox::sodiumDecrypt($crypted))->isIdenticalTo($string);
+   }
+
+   /**
+    * Test blank or null content. If not handled correctly, a sodium exception would be raised and fail the test.
+    * This could be a blank password that was never encrypted, so it is a blank value in the DB still.
+    * @since 9.5.0
+    */
+   public function testSodiumDecryptBlank() {
+      $this->variable(\Toolbox::sodiumDecrypt(null))->isNull();
+      $this->string(\Toolbox::sodiumDecrypt(''))->isEmpty();
    }
 
    protected function cleanProvider() {
@@ -817,4 +834,61 @@ class Toolbox extends \GLPITestCase {
       $this->string(\Toolbox::getFgColor($bg_color, $offset))
          ->isEqualTo($fg_color);
    }
+
+   protected function testIsCommonDBTMProvider() {
+      return [
+         [
+            'class'         => TicketFollowup::class,
+            'is_commondbtm' => false,
+         ],
+         [
+            'class'         => Ticket::class,
+            'is_commondbtm' => true,
+         ],
+         [
+            'class'         => ITILFollowup::class,
+            'is_commondbtm' => true,
+         ],
+         [
+            'class'         => "Not a real class",
+            'is_commondbtm' => false,
+         ],
+      ];
+   }
+
+   /**
+    * @dataProvider testIsCommonDBTMProvider
+    */
+   public function testIsCommonDBTM(string $class, bool $is_commondbtm) {
+      $this->boolean(\Toolbox::isCommonDBTM($class))->isEqualTo($is_commondbtm);
+   }
+
+   protected function testIsAPIDeprecatedProvider() {
+      return [
+         [
+            'class'         => TicketFollowup::class,
+            'is_deprecated' => true,
+         ],
+         [
+            'class'         => Ticket::class,
+            'is_deprecated' => false,
+         ],
+         [
+            'class'         => ITILFollowup::class,
+            'is_deprecated' => false,
+         ],
+         [
+            'class'         => "Not a real class",
+            'is_deprecated' => false,
+         ],
+      ];
+   }
+
+   /**
+    * @dataProvider testIsAPIDeprecatedProvider
+    */
+   public function testIsAPIDeprecated(string $class, bool $is_deprecated) {
+      $this->boolean(\Toolbox::isAPIDeprecated($class))->isEqualTo($is_deprecated);
+   }
+
 }

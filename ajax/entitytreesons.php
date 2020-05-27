@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -60,7 +60,6 @@ if (isset($_GET['node'])) {
          ];
 
          if ($is_recursive) {
-            $path['children'] = true;
             $result2 = $DB->request([
                'FROM'   => 'glpi_entities',
                'COUNT'  => 'cpt',
@@ -68,6 +67,7 @@ if (isset($_GET['node'])) {
             ]);
             $result2 = $result2->next();
             if ($result2['cpt'] > 0) {
+               $path['children'] = true;
                //apend a i tag (one of shortest tags) to have the is_recursive link
                $path['text'].= '<i/>';
                if (isset($ancestors[$ID])) {

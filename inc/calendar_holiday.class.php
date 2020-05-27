@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -181,9 +181,10 @@ class Calendar_Holiday extends CommonDBRelation {
       echo "</div>";
    }
 
-
    /**
     * Duplicate all holidays from a calendar to its clone
+    *
+    * @deprecated 9.5
     *
     * @param integer $oldid The ID of the calendar to copy from.
     * @param integer $newid The ID of the calendar to copy to.
@@ -191,6 +192,7 @@ class Calendar_Holiday extends CommonDBRelation {
    static function cloneCalendar($oldid, $newid) {
       global $DB;
 
+      Toolbox::deprecated('Use clone');
       $result = $DB->request(
          [
             'FROM'   => self::getTable(),

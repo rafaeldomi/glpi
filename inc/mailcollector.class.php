@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -92,6 +92,10 @@ class MailCollector  extends CommonDBTM {
    const REQUESTER_FIELD_FROM = 0;
    const REQUESTER_FIELD_REPLY_TO = 1;
 
+   static $undisclosedFields = [
+      'passwd',
+   ];
+
    static function getTypeName($nb = 0) {
       return _n('Receiver', 'Receivers', $nb);
    }
@@ -134,7 +138,7 @@ class MailCollector  extends CommonDBTM {
          if (empty($input["passwd"])) {
             unset($input["passwd"]);
          } else {
-            $input["passwd"] = Toolbox::encrypt(stripslashes($input["passwd"]), GLPIKEY);
+            $input["passwd"] = Toolbox::sodiumEncrypt(stripslashes($input["passwd"]));
          }
       }
 
@@ -174,6 +178,7 @@ class MailCollector  extends CommonDBTM {
       $ong = [];
       $this->addDefaultFormTab($ong);
       $this->addStandardTab(__CLASS__, $ong, $options);
+      $this->addImpactTab($ong, $options);
       $this->addStandardTab('Log', $ong, $options);
 
       return $ong;
@@ -1245,7 +1250,7 @@ class MailCollector  extends CommonDBTM {
       $params = [
          'host'      => $config['address'],
          'user'      => $this->fields['login'],
-         'password'  => Toolbox::decrypt($this->fields['passwd'], GLPIKEY),
+         'password'  => Toolbox::sodiumDecrypt($this->fields['passwd']),
          'port'      => $config['port']
       ];
 
@@ -1262,9 +1267,11 @@ class MailCollector  extends CommonDBTM {
       }
 
       try {
-         $class = '\Laminas\Mail\Storage\\';
-         $class .= ($config['type']== 'pop' ? 'Pop3' : 'Imap');
-         $this->storage = new $class($params);
+         $storage = Toolbox::getMailServerStorageInstance($config['type'], $params);
+         if ($storage === null) {
+            throw new \Exception(sprintf(__('Unsupported mail server type:%s.'), $config['type']));
+         }
+         $this->storage = $storage;
          if ($this->fields['errors'] > 0) {
             $this->update([
                'id'     => $this->getID(),
@@ -1285,7 +1292,7 @@ class MailCollector  extends CommonDBTM {
          $this->marubox = imap_open(
             $this->fields['host'],
             $this->fields['login'],
-            Toolbox::decrypt($this->fields['passwd'], GLPIKEY),
+            Toolbox::sodiumDecrypt($this->fields['passwd']),
             CL_EXPUNGE,
             1
          );
@@ -1298,7 +1305,7 @@ class MailCollector  extends CommonDBTM {
             $this->marubox = imap_open(
                $this->fields['host'],
                $this->fields['login'],
-               Toolbox::decrypt($this->fields['passwd'], GLPIKEY),
+               Toolbox::sodiumDecrypt($this->fields['passwd']),
                CL_EXPUNGE,
                1,
                $option
@@ -1591,11 +1598,11 @@ class MailCollector  extends CommonDBTM {
                $tag = Rule::getUuid();
                $this->tags[$filename]  = $tag;
 
-               // Link file based on id
-               if (isset($part->id)) {
+               // Link file based on Content-ID header
+               if (isset($part->contentId)) {
                   $clean = ['<' => '',
                                  '>' => ''];
-                  $this->altfiles[strtr($part->id, $clean)] = $filename;
+                  $this->altfiles[strtr($part->contentId, $clean)] = $filename;
                }
             }
          }
@@ -1959,10 +1966,6 @@ class MailCollector  extends CommonDBTM {
       Rule::cleanForItemCriteria($this, '_mailgate');
    }
 
-
-   static public function unsetUndisclosedFields(&$fields) {
-      unset($fields['passwd']);
-   }
 
 
    /**

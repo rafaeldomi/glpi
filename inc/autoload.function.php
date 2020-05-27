@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -259,7 +259,6 @@ function glpi_autoload($classname) {
    global $DEBUG_AUTOLOAD;
    static $notfound = ['xStates'    => true,
                             'xAllAssets' => true, ];
-
    // empty classname or non concerted plugin or classname containing dot (leaving GLPI main treee)
    if (empty($classname) || is_numeric($classname) || (strpos($classname, '.') !== false)) {
       trigger_error(
@@ -287,12 +286,43 @@ function glpi_autoload($classname) {
 
    if ($plug = isPluginItemType($classname)) {
       $plugname = strtolower($plug['plugin']);
-      $dir      = GLPI_ROOT . "/plugins/$plugname/inc/";
-      $item     = str_replace('\\', '/', strtolower($plug['class']));
+
+      // check plugin exists and is enabled
       if (!Plugin::isPluginLoaded($plugname)) {
          // Do not load plugin class if plugin is not loaded
          return false;
       }
+
+      $item = str_replace('\\', '/', strtolower($plug['class']));
+
+      // load from first found directory
+      foreach (PLUGINS_DIRECTORIES as $base_dir) {
+         $dir = "$base_dir/$plugname/inc/";
+         if (is_dir($dir)) {
+            break;
+         }
+      }
+   } else if (strpos($classname, 'Glpi\Tests\Web\Deprecated') !== false) {
+      // Special case to autoload files in the tests dir that have a namespace
+      // and are not an atoum test case
+      $dir = GLPI_ROOT . "/tests/";
+
+      // Convert classname to array
+      $path = explode('\\', $classname);
+
+      // Remove first two items (Glpi\Tests)
+      array_splice($path, 0, 2);
+
+      // Extract file name
+      $item = array_pop($path);
+
+      // Convert all remaining path to lowercase
+      $path = array_map(function($folder) {
+         return strtolower($folder);
+      }, $path);
+
+      // Revert to string and add to dir path
+      $dir .= implode('/', $path) . '/';
    } else {
       $item = strtolower($classname);
       if (substr($classname, 0, \strlen(NS_GLPI)) === NS_GLPI) {

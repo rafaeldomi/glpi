@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -49,7 +49,7 @@ if (empty($itemtype)) {
 
 // Check if itemtype is valid in the given context
 if ($context == "impact") {
-   $isValidItemtype = isset($CFG_GLPI['impact_asset_types'][$itemtype]);
+   $isValidItemtype = Impact::isEnabled($itemtype);
 } else {
    $isValidItemtype = CommonITILObject::isPossibleToAssignType($itemtype);
 }

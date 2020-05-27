@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -43,7 +43,10 @@ use Sabre\VObject\Component\VTodo;
 /**
  * Reminder Class
 **/
-class Reminder extends CommonDBVisible implements CalDAVCompatibleItemInterface {
+class Reminder extends CommonDBVisible implements
+   CalDAVCompatibleItemInterface,
+   ExtraVisibilityCriteria
+{
    use PlanningEvent {
       post_getEmpty as trait_post_getEmpty;
    }
@@ -239,7 +242,7 @@ class Reminder extends CommonDBVisible implements CalDAVCompatibleItemInterface 
     *
     * @return array
     */
-   static public function getVisibilityCriteria($forceall = false) {
+   static public function getVisibilityCriteria(bool $forceall = false): array {
       if (!Session::haveRight(self::$rightname, READ)) {
          return [
             'WHERE' => ['glpi_reminders.users_id' => Session::getLoginUserID()],
@@ -582,7 +585,7 @@ class Reminder extends CommonDBVisible implements CalDAVCompatibleItemInterface 
 
       $this->showFormHeader($options);
 
-      echo "<tr class='tab_bg_2'><td colspan='2'>".__('Title')."</td>";
+      echo "<tr class='tab_bg_2'><td>".__('Title')."</td>";
       echo "<td colspan='2'>";
       if (!$ID) {
          echo "<input type='hidden' name='users_id' value='".$this->fields['users_id']."'>\n";
@@ -604,19 +607,17 @@ class Reminder extends CommonDBVisible implements CalDAVCompatibleItemInterface 
 
       if (!isset($options['from_planning_ajax'])) {
          echo "<tr class='tab_bg_2'>";
-         echo "<td colspan='2'>".__('Visibility')."</td>";
+         echo "<td>".__('Visibility')."</td>";
          echo "<td colspan='2'>";
          echo '<table><tr><td>';
          echo __('Begin').'</td><td>';
          Html::showDateTimeField("begin_view_date",
                                  ['value'      => $this->fields["begin_view_date"],
-                                       'timestep'   => 1,
                                        'maybeempty' => true,
                                        'canedit'    => $canedit]);
          echo '</td><td>'.__('End').'</td><td>';
          Html::showDateTimeField("end_view_date",
                                  ['value'      => $this->fields["end_view_date"],
-                                       'timestep'   => 1,
                                        'maybeempty' => true,
                                        'canedit'    => $canedit]);
          echo '</td></tr></table>';
@@ -625,7 +626,7 @@ class Reminder extends CommonDBVisible implements CalDAVCompatibleItemInterface 
       }
 
       echo "<tr class='tab_bg_2'>";
-      echo "<td colspan='2'>".__('Status')."</td>";
+      echo "<td>".__('Status')."</td>";
       echo "<td colspan='2'>";
       if ($canedit) {
          Planning::dropdownState("state", $this->fields["state"]);
@@ -635,7 +636,7 @@ class Reminder extends CommonDBVisible implements CalDAVCompatibleItemInterface 
       echo "</td>\n";
       echo "</tr>\n";
 
-      echo "<tr class='tab_bg_2'><td  colspan='2'>".__('Calendar')."</td>";
+      echo "<tr class='tab_bg_2'><td>".__('Calendar')."</td>";
       $active_recall = ($ID && $this->fields["is_planned"] && PlanningRecall::isAvailable());
 
       echo "<td";

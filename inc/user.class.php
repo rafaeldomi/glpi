@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -54,6 +54,13 @@ class User extends CommonDBTM {
    const UPDATEAUTHENT       = 4096;
 
    static $rightname = 'user';
+
+   static $undisclosedFields = [
+      'password',
+      'personal_token',
+      'api_token',
+      'cookie_token',
+   ];
 
    private $entities = null;
 
@@ -244,6 +251,7 @@ class User extends CommonDBTM {
 
       $ong = [];
       $this->addDefaultFormTab($ong);
+      $this->addImpactTab($ong, $options);
       $this->addStandardTab('Profile_User', $ong, $options);
       $this->addStandardTab('Group_User', $ong, $options);
       $this->addStandardTab('Config', $ong, $options);
@@ -273,9 +281,6 @@ class User extends CommonDBTM {
       }
    }
 
-   static public function unsetUndisclosedFields(&$fields) {
-      unset($fields['password']);
-   }
 
    function pre_deleteItem() {
       global $DB;
@@ -548,7 +553,7 @@ class User extends CommonDBTM {
          return false;
       }
 
-      if (!Auth::isValidLogin($input['name'])) {
+      if (!Auth::isValidLogin(stripslashes($input['name']))) {
          Session::addMessageAfterRedirect(__('The login is not valid. Unable to add the user.'),
                                           false, ERROR);
          return false;
@@ -628,6 +633,19 @@ class User extends CommonDBTM {
          $input["profiles_id"] = 0;
       }
 
+      return $input;
+   }
+
+   public function prepareInputForClone($input) {
+      if (isset($input['name'])) {
+         $suffix = 1;
+         $possibleName = $input['name'].$suffix;
+         while ($this->getFromDBbyName($possibleName)) {
+            $suffix++;
+            $possibleName = $input['name'].$suffix;
+         }
+         $input['name'] = $possibleName;
+      }
       return $input;
    }
 
@@ -1340,7 +1358,7 @@ class User extends CommonDBTM {
       }
    }
 
-   function computeFriendlyName() {
+   protected function computeFriendlyName() {
       global $CFG_GLPI;
 
       if (isset($this->fields["id"]) && ($this->fields["id"] > 0)) {
@@ -1625,7 +1643,7 @@ class User extends CommonDBTM {
                      break;
 
                   case 'users_id_supervisor':
-                     $this->fields[$k] = self::getIdByField('user_dn', $val);
+                     $this->fields[$k] = self::getIdByField('user_dn', $val, false);
                      break;
 
                   default :
@@ -2206,7 +2224,6 @@ JAVASCRIPT;
          echo "<td><label for='showdate$sincerand'>".__('Valid since')."</label></td><td>";
          Html::showDateTimeField("begin_date", ['value'       => $this->fields["begin_date"],
                                                 'rand'        => $sincerand,
-                                                'timestep'    => 1,
                                                 'maybeempty'  => true]);
          echo "</td>";
 
@@ -2214,7 +2231,6 @@ JAVASCRIPT;
          echo "<td><label for='showdate$untilrand'>".__('Valid until')."</label></td><td>";
          Html::showDateTimeField("end_date", ['value'       => $this->fields["end_date"],
                                               'rand'        => $untilrand,
-                                              'timestep'    => 1,
                                               'maybeempty'  => true]);
          echo "</td></tr>";
       }
@@ -2850,7 +2866,7 @@ JAVASCRIPT;
                                              false, ERROR);
          }
 
-         if (!Auth::isValidLogin($this->input['name'])) {
+         if (!Auth::isValidLogin(stripslashes($this->input['name']))) {
             $this->fields['name'] = $this->oldvalues['name'];
             unset($this->updates[$key]);
             unset($this->oldvalues['name']);
@@ -3607,8 +3623,11 @@ JAVASCRIPT;
 
          case "all" :
             $WHERE = [
-               'glpi_users.id' => ['>', 0]
-            ] + getEntitiesRestrictCriteria('glpi_profiles_users', '', $entity_restrict, 1);
+               'glpi_users.id' => ['>', 0],
+               'OR' => [
+                  'glpi_profiles_users.entities_id' => null
+               ] + getEntitiesRestrictCriteria('glpi_profiles_users', '', $entity_restrict, 1)
+            ];
             break;
 
          default :
@@ -4531,13 +4550,17 @@ JAVASCRIPT;
     *
     * @return integer
     */
-   static function getIdByField($field, $value) {
+   static function getIdByField($field, $value, $escape = true) {
       global $DB;
+
+      if ($escape) {
+         $value = addslashes($value);
+      }
 
       $iterator = $DB->request([
          'SELECT' => 'id',
          'FROM'   => self::getTable(),
-         'WHERE'  => [$field => addslashes($value)]
+         'WHERE'  => [$field => $value]
       ]);
 
       if (count($iterator) == 1) {

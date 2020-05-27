@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -300,8 +300,11 @@ $default_prefs = [
    'password_expiration_lock_delay'          => '-1',
    'default_dashboard_central'               => 'central',
    'default_dashboard_assets'                => 'assets',
-   'default_dashboard_helpdesk'              => 'helpdesk',
-   'default_dashboard_mini_ticket'           => 'mini_ticket',
+   'default_dashboard_helpdesk'              => 'assistance',
+   'default_dashboard_mini_ticket'           => 'mini_tickets',
+   'admin_email_noreply'                     => '',
+   'admin_email_noreply_name'                => '',
+   Impact::CONF_ENABLED                      => exportArrayToDB(Impact::getDefaultItemtypes())
 ];
 
 $tables['glpi_configs'] = [];
@@ -655,6 +658,29 @@ $tables['glpi_crontasks'] = [
       'logs_lifetime' => 30,
    ],
 ];
+
+$dashboards_data = include_once __DIR__."/update_94_95/dashboards.php";
+$tables['glpi_dashboards_dashboards'] = [];
+$tables['glpi_dashboards_items'] = [];
+$i = $j = 1;
+foreach ($dashboards_data as $default_dashboard) {
+   $items = $default_dashboard['_items'];
+   unset($default_dashboard['_items']);
+   $tables['glpi_dashboards_dashboards'][] = array_merge([
+      'id' => $i
+   ], $default_dashboard);
+
+   foreach ($items as $item) {
+      $tables['glpi_dashboards_items'][] = array_merge([
+         'id' => $j,
+         'dashboards_dashboards_id' => $i,
+      ], $item);
+
+      $j++;
+   }
+
+   $i++;
+}
 
 $tables['glpi_devicememorytypes'] = [
    [
@@ -1645,6 +1671,7 @@ $tables['glpi_displaypreferences'] = [
 $ADDTODISPLAYPREF['Cluster'] = [31, 19];
 $ADDTODISPLAYPREF['Domain'] = [3, 4, 2, 6, 7];
 $ADDTODISPLAYPREF['DomainRecord'] = [2, 3];
+$ADDTODISPLAYPREF['Appliance'] = [2, 3, 4, 5];
 
 foreach ($ADDTODISPLAYPREF as $type => $options) {
    $rank = 1;
@@ -2064,6 +2091,7 @@ $tables['glpi_entities'] = [
       'autofill_decommission_date'           => 0,
       'suppliers_as_private'                 => 0,
       'enable_custom_css'                    => 0,
+      'anonymize_support_agents'             => 0,
    ],
 ];
 
@@ -7307,6 +7335,38 @@ $tables['glpi_profilerights'] = [
       'profiles_id' => '8',
       'name'        => 'dashboard',
       'rights'      => 0,
+   ], [
+      'profiles_id' => '1',
+      'name'        => 'appliance',
+      'rights'      => 0,
+   ], [
+      'profiles_id' => '2',
+      'name'        => 'appliance',
+      'rights'      => 1,
+   ], [
+      'profiles_id' => '3',
+      'name'        => 'appliance',
+      'rights'      => 31,
+   ], [
+      'profiles_id' => '4',
+      'name'        => 'appliance',
+      'rights'      => 31,
+   ], [
+      'profiles_id' => '5',
+      'name'        => 'appliance',
+      'rights'      => 0,
+   ], [
+      'profiles_id' => '6',
+      'name'        => 'appliance',
+      'rights'      => 31,
+   ], [
+      'profiles_id' => '7',
+      'name'        => 'appliance',
+      'rights'      => 31,
+   ], [
+      'profiles_id' => '8',
+      'name'        => 'appliance',
+      'rights'      => 1,
    ],
 ];
 

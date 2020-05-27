@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -184,14 +184,17 @@ class Auth extends CommonGLPI {
             $ssl = 'TLS';
          }
 
-         $imap = new \Laminas\Mail\Protocol\Imap();
-         $imap->connect(
+         $protocol = Toolbox::getMailServerProtocolInstance($config['type']);
+         if ($protocol === null) {
+            throw new \RuntimeException(sprintf(__('Unsupported mail server type:%s.'), $config['type']));
+         }
+         $protocol->connect(
             $config['address'],
             $config['port'],
             $ssl
          );
 
-         return $imap->login($login, $pass);
+         return $protocol->login($login, $pass);
       } catch (\Exception $e) {
          $this->addToError($e->getMessage());
          return false;
@@ -739,8 +742,7 @@ class Auth extends CommonGLPI {
                   $ds = AuthLDAP::connectToServer($ldap_method["host"],
                                                   $ldap_method["port"],
                                                   $ldap_method["rootdn"],
-                                                  Toolbox::decrypt($ldap_method["rootdn_passwd"],
-                                                                   GLPIKEY),
+                                                  Toolbox::sodiumDecrypt($ldap_method["rootdn_passwd"]),
                                                   $ldap_method["use_tls"],
                                                   $ldap_method["deref_option"]);
 

@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -42,38 +42,4 @@ class DomainType extends CommonDropdown
       return _n('Domain type', 'Domain types', $nb);
    }
 
-   /**
-    * @param $ID
-    * @param $entity
-    * @return integer
-    */
-   static function transfer($ID, $entity) {
-      global $DB;
-
-      if ($ID > 0) {
-         // Not already transfer
-         // Search init item
-         $iterator = $DB->request([
-            'FROM'   => self::getTable(),
-            'WHERE'  => ['id' => $ID]
-         ]);
-
-         if (count($iterator)) {
-            $data = $iterator->next();
-            $input = [
-               'name'         => Toolbox::addslashes_deep($data['name']),
-               'entities_id'  => $entity
-            ];
-            $temp = new self();
-            $newID = $temp->getID();
-
-            if ($newID < 0) {
-               $newID = $temp->import($input);
-            }
-
-            return $newID;
-         }
-      }
-      return 0;
-   }
 }

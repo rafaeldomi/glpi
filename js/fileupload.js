@@ -1,7 +1,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -133,7 +133,7 @@ var displayUploadedFile = function(file, tag, editor, input_name) {
    if (filecontainer.length) {
       var ext = file.name.split('.').pop();
 
-      var p = $('<p/>')
+      var p = $('<p></p>')
          .attr('id',file.id)
          .html(
             getExtIcon(ext)
@@ -311,7 +311,7 @@ var isImageBlobFromPaste = function(content) {
 * @return {string}  Source of image or empty string.
 */
 var extractSrcFromImgTag = function(content) {
-   var foundImage = $('<div/>').append(content).find('img');
+   var foundImage = $('<div></div>').append(content).find('img');
    if (foundImage.length > 0) {
       return foundImage.attr('src');
    }
@@ -326,7 +326,8 @@ var extractSrcFromImgTag = function(content) {
  */
 var insertImageInTinyMCE = function(editor, image) {
    //make ajax call for upload doc
-   var tag = uploadFile(image, editor);
+   var input_name = $(editor.targetElm).attr('name');
+   var tag = uploadFile(image, editor, input_name);
    if (tag !== false) {
       insertImgFromFile(editor, image, tag);
    }

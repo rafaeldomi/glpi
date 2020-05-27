@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -55,11 +55,15 @@ class NetworkPortFiberchannel extends NetworkPortInstantiation {
    function prepareInput($input) {
 
       if (isset($input['speed']) && ($input['speed'] == 'speed_other_value')) {
-         $speed = self::transformPortSpeed($input['speed_other_value'], false);
-         if ($speed === false) {
+         if (!isset($input['speed_other_value'])) {
             unset($input['speed']);
          } else {
-            $input['speed'] = $speed;
+            $speed = self::transformPortSpeed($input['speed_other_value'], false);
+            if ($speed === false) {
+               unset($input['speed']);
+            } else {
+               $input['speed'] = $speed;
+            }
          }
       }
       return $input;

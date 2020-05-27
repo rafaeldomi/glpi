@@ -114,9 +114,10 @@ App(lication) token
      You should pass this parameter in 'Authorization' HTTP header.
      A valid Authorization header is:
         * "Authorization: user_token q56hqkniwot8wntb3z1qarka5atf365taaa2uyjrn"
-
+* **Parameters**: (query string)
+  * *get_full_session* (default: false): Get the full session, useful if you want to login and access session data in one request.
 * **Returns**:
-  * 200 (OK) with the *session_token* string and the *ID of the logged in user*.
+  * 200 (OK) with the *session_token* string.
   * 400 (Bad Request) with a message indicating an error in input parameter.
   * 401 (UNAUTHORIZED)
 
@@ -131,20 +132,24 @@ $ curl -X GET \
 
 < 200 OK
 < {
-   "session_token": "83af7e620c83a50a18d3eac2f6ed05a3ca0bea62",
-   "users_id": "42"
+   "session_token": "83af7e620c83a50a18d3eac2f6ed05a3ca0bea62"
 }
 
 $ curl -X GET \
 -H 'Content-Type: application/json' \
 -H "Authorization: user_token q56hqkniwot8wntb3z1qarka5atf365taaa2uyjrn" \
 -H "App-Token: f7g3csp8mgatg5ebc5elnazakw20i9fyev1qopya7" \
-'http://path/to/glpi/apirest.php/initSession'
+'http://path/to/glpi/apirest.php/initSession?get_full_session=true'
 
 < 200 OK
 < {
    "session_token": "83af7e620c83a50a18d3eac2f6ed05a3ca0bea62",
-   "users_id": "42"
+   "session": {
+      'glpi_plugins': ...,
+      'glpicookietest': ...,
+      'glpicsrftokens': ...,
+      ...
+   }
 }
 ```
 
@@ -1288,6 +1293,33 @@ $ curl -X GET \
 
 The body of the answer contains the raw file attached to the document.
 
+### Get a user's profile picture
+
+* **URL**: apirest.php/User/:id/Picture
+* **Description**: Get a user's profile picture.
+* **Method**: GET
+* **Parameters**: (Headers)
+  * *Session-Token*: session var provided by [initSession](#init-session) endpoint. Mandatory.
+  * *App-Token*: authorization string provided by the GLPI API configuration. Optional.
+* **Returns**:
+  * 200 (OK) with the raw image in the request body.
+  * 204 (No content) if the request is correct but the specified user doesn't have a profile picture.
+  * 400 (Bad Request) with a message indicating an error in input parameter.
+
+Example usage (CURL):
+
+```bash
+$ curl -X GET \
+-H 'Content-Type: application/json' \
+-H "Session-Token: 83af7e620c83a50a18d3eac2f6ed05a3ca0bea62" \
+-H "App-Token: f7g3csp8mgatg5ebc5elnazakw20i9fyev1qopya7" \
+'http://path/to/glpi/apirest.php/User/2/Picture/'
+
+< 200 OK
+```
+
+The body of the answer contains the raw image.
+
 ## Errors
 
 ### ERROR_ITEM_NOT_FOUND
@@ -1426,6 +1458,14 @@ You need to uncomment (removing #) theses lines:
 
 By enabling URL rewriting, you could use API with this URL : <http://path/to/glpi/api/>.
 You need also to enable rewrite module in apache httpd and permit GLPI's .htaccess to override server configuration (see AllowOverride directive).
+
+**Note for apache+fpm users:**  
+
+You may have difficulties to pass Authorization header in this configuration.
+You have two options :
+
+- pass the `user_token` or credentials (login/password) in the http query (as GET parameters).
+- add env to your virtualhost: `SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1`.
 
 ### Nginx
 

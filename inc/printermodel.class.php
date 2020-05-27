@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -42,6 +42,11 @@ class PrinterModel extends CommonDropdown {
 
    static function getTypeName($nb = 0) {
       return _n('Printer model', 'Printer models', $nb);
+   }
+
+
+   static function getFieldLabel() {
+      return __('Model');
    }
 
 

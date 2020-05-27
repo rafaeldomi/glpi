@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -260,7 +260,7 @@ class Contact extends CommonDBTM{
    }
 
 
-   public function computeFriendlyName() {
+   protected function computeFriendlyName() {
 
       if (isset($this->fields["id"]) && ($this->fields["id"] > 0)) {
          return formatUserName('',

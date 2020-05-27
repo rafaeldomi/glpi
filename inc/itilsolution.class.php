@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -46,6 +46,10 @@ class ITILSolution extends CommonDBChild {
 
    static public $itemtype = 'itemtype'; // Class name or field name (start with itemtype) for link to Parent
    static public $items_id = 'items_id'; // Field name
+
+   public static function getNameField() {
+      return 'id';
+   }
 
    static function getTypeName($nb = 0) {
       return _n('Solution', 'Solutions', $nb);
@@ -329,7 +333,13 @@ class ITILSolution extends CommonDBChild {
 
       // Replace inline pictures
       $this->input["_job"] = $this->item;
-      $this->input = $this->addFiles($this->input, ['force_update' => true]);
+      $this->input = $this->addFiles(
+         $this->input, [
+            'force_update' => true,
+            'name' => 'content',
+            'content_field' => 'content',
+         ]
+      );
 
       // Add solution to duplicates
       if ($this->item->getType() == 'Ticket' && !isset($this->input['_linked_ticket'])) {
@@ -360,16 +370,27 @@ class ITILSolution extends CommonDBChild {
       parent::post_addItem();
    }
 
-
-   /**
-    * @see CommonDBTM::prepareInputForUpdate()
-   **/
    function prepareInputForUpdate($input) {
 
-      // Replace inline pictures
-      $input = $this->addFiles($input);
+      if (!isset($this->fields['itemtype'])) {
+         return false;
+      }
+      $input["_job"] = new $this->fields['itemtype']();
+      if (!$input["_job"]->getFromDB($this->fields["items_id"])) {
+         return false;
+      }
 
       return $input;
+   }
+
+   function post_updateItem($history = 1) {
+      // Replace inline pictures
+      $options = [
+         'force_update' => true,
+         'name' => 'content',
+         'content_field' => 'content',
+      ];
+      $this->input = $this->addFiles($this->input, $options);
    }
 
 

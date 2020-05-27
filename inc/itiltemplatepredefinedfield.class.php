@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -42,14 +42,14 @@ if (!defined('GLPI_ROOT')) {
  *
  * @since 9.5.0
 **/
-class ITILTemplatePredefinedField extends ITILTemplateField {
+abstract class ITILTemplatePredefinedField extends ITILTemplateField {
 
    static function getTypeName($nb = 0) {
       return _n('Predefined field', 'Predefined fields', $nb);
    }
 
 
-   function computeFriendlyName() {
+   protected function computeFriendlyName() {
 
       $tt_class = static::$itemtype;
       $tt     = new $tt_class;

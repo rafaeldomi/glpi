@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -112,5 +112,9 @@ class Item_DeviceSimcard extends Item_Devices {
                                   'tooltip'    => __('MSIN is the last 8 or 10 digits of IMSI'),
                                   'autocomplete' => true,],
       ];
+   }
+
+   static function getNameField() {
+      return 'serial';
    }
 }

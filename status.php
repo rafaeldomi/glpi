@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -104,8 +104,7 @@ if (($ok_master || $ok_slave )
       foreach ($ldap_methods as $method) {
          echo " ".$method['name'];
          if (AuthLDAP::tryToConnectToServer($method, $method["rootdn"],
-                                            Toolbox::decrypt($method["rootdn_passwd"],
-                                            GLPIKEY))) {
+                                            Toolbox::sodiumDecrypt($method["rootdn_passwd"]))) {
             echo "_OK";
          } else {
             echo "_PROBLEM";

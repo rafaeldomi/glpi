@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -72,15 +72,7 @@ class Item_Devices extends CommonDBRelation {
 
    static public $mustBeAttached_2 = false; // Mandatory to display creation form
 
-   /**
-    * @since 0.85
-    * No READ right for devices and extends CommonDBRelation not CommonDevice
-   **/
-   static function canView() {
-      return true;
-   }
-
-   public function computeFriendlyName() {
+   protected function computeFriendlyName() {
       $itemtype = static::$itemtype_2;
       if (!empty($this->fields[static::$itemtype_1])) {
          $item = new $this->fields[static::$itemtype_1];
@@ -499,10 +491,48 @@ class Item_Devices extends CommonDBRelation {
       return str_replace ('Item_', '', $devicetype);
    }
 
+    /**
+    * get items associated to the given one (defined by $itemtype and $items_id)
+    *
+    * @param string  $itemtype          the type of the item we want the resulting items to be associated to
+    * @param string  $items_id          the name of the item we want the resulting items to be associated to
+    *
+    * @return array the items associated to the given one (empty if none was found)
+   **/
+   static function getItemsAssociatedTo($itemtype, $items_id) {
+      global $DB;
 
+      $res = [];
+      foreach (self::getItemAffinities($itemtype) as $link_type) {
+         $table = $link_type::getTable();
+         $iterator = $DB->request([
+            'SELECT' => 'id',
+            'FROM'   => $table,
+            'WHERE'  => [
+               'itemtype'  => $itemtype,
+               'items_id'  => $items_id
+            ]
+         ]);
+
+         while ($row = $iterator->next()) {
+            $input = Toolbox::addslashes_deep($row);
+            $item = new $link_type();
+            $item->getFromDB($input['id']);
+            $res[] = $item;
+         }
+      }
+      return $res;
+   }
+
+   /**
+    *
+    * @deprecated 9.5
+    *
+   **/
    static function cloneItem($itemtype, $oldid, $newid) {
       global $DB;
 
+      Toolbox::deprecated('Use clone');
       foreach (self::getItemAffinities($itemtype) as $link_type) {
          $table = $link_type::getTable();
          $olds = $DB->request([
@@ -1427,7 +1457,15 @@ class Item_Devices extends CommonDBRelation {
       global $CFG_GLPI;
 
       if (!isset($input[static::$items_id_2]) || !$input[static::$items_id_2]) {
-         Session::addMessageAfterRedirect(__('A device ID is mandatory'), false, ERROR);
+         Session::addMessageAfterRedirect(
+            sprintf(
+               __('%1$s: %2$s'),
+               static::getTypeName(),
+               __('A device ID is mandatory')
+            ),
+            false,
+            ERROR
+         );
          return false;
       }
 

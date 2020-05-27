@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -57,6 +57,10 @@ abstract class CommonITILTask extends CommonDBTM implements CalDAVCompatibleItem
 
    public function getItilObjectItemType() {
       return str_replace('Task', '', $this->getType());
+   }
+
+   public static function getNameField() {
+      return 'id';
    }
 
 
@@ -290,14 +294,19 @@ abstract class CommonITILTask extends CommonDBTM implements CalDAVCompatibleItem
          }
       }
 
-      $input = $this->addFiles($input);
-
       return $input;
    }
 
 
    function post_updateItem($history = 1) {
       global $CFG_GLPI;
+
+      $options = [
+         'force_update' => true,
+         'name' => 'content',
+         'content_field' => 'content',
+      ];
+      $this->input = $this->addFiles($this->input, $options);
 
       if (in_array("begin", $this->updates)) {
          PlanningRecall::managePlanningUpdates($this->getType(), $this->getID(),
@@ -337,7 +346,7 @@ abstract class CommonITILTask extends CommonDBTM implements CalDAVCompatibleItem
             // change ticket status (from splitted button)
             $itemtype = $this->getItilObjectItemType();
             $this->input['_job'] = new $itemtype();
-            if (!$this->input['_job']->getFromDB($this->input[$this->input['_job']->getForeignKeyField()])) {
+            if (!$this->input['_job']->getFromDB($this->fields[$this->input['_job']->getForeignKeyField()])) {
                return false;
             }
             if (isset($this->input['_status'])
@@ -445,8 +454,10 @@ abstract class CommonITILTask extends CommonDBTM implements CalDAVCompatibleItem
    function post_addItem() {
       global $CFG_GLPI;
 
-      // Add document if needed, without notification
+      // Add document if needed, without notification for file input
       $this->input = $this->addFiles($this->input, ['force_update' => true]);
+      // Add document if needed, without notification for textarea
+      $this->input = $this->addFiles($this->input, ['name' => 'content', 'force_update' => true]);
 
       if (isset($this->input['_planningrecall'])) {
          $this->input['_planningrecall']['items_id'] = $this->fields['id'];
@@ -558,7 +569,7 @@ abstract class CommonITILTask extends CommonDBTM implements CalDAVCompatibleItem
 
 
    // SPECIFIC FUNCTIONS
-   public function computeFriendlyName() {
+   protected function computeFriendlyName() {
 
       if (isset($this->fields['taskcategories_id'])) {
          if ($this->fields['taskcategories_id']) {
@@ -1531,9 +1542,10 @@ abstract class CommonITILTask extends CommonDBTM implements CalDAVCompatibleItem
          echo "<div class='fa-label'>
          <i class='far fa-calendar fa-fw'
             title='".__('Date')."'></i>";
-         Html::showDateTimeField("date", ['value'      => $this->fields["date"],
-                                               'timestep'   => 1,
-                                               'maybeempty' => false]);
+         Html::showDateTimeField("date", [
+            'value'      => $this->fields["date"],
+            'maybeempty' => false
+         ]);
          echo "</div>";
       }
 

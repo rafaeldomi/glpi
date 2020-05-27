@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -678,7 +678,7 @@ class Change extends CommonITILObject {
          $this->check(-1, CREATE, $options);
       }
 
-      $canupdate = !$ID && $this->canUpdateItem();
+      $canupdate = !$ID || $this->canUpdateItem();
       $showuserlink = 0;
       if (User::canView()) {
          $showuserlink = 1;
@@ -788,18 +788,7 @@ class Change extends CommonITILObject {
          }
       }
 
-      if (!$options['template_preview']) {
-         $this->showFormHeader($options);
-         if (isset($this->fields['_tasktemplates_id'])) {
-            foreach ($this->fields['_tasktemplates_id'] as $tasktemplates_id) {
-               echo "<input type='hidden' name='_tasktemplates_id[]' value='$tasktemplates_id'>";
-            }
-         }
-      }
-
-      echo "<div class='spaced' id='tabsbody'>";
-
-      echo "<table class='tab_cadre_fixe' id='mainformtable'>";
+      $this->showFormHeader($options);
 
       echo "<tr class='tab_bg_1'>";
       echo "<th class='left' width='$colsize1%'>";
@@ -835,7 +824,6 @@ class Change extends CommonITILObject {
       Html::showDateTimeField(
          "date", [
             'value'      => $date,
-            'timestep'   => 1,
             'maybeempty' => false,
             'required'   => ($tt->isMandatoryField('date') && !$ID)
          ]
@@ -859,7 +847,6 @@ class Change extends CommonITILObject {
       Html::showDateTimeField(
          "time_to_resolve", [
             'value'    => $this->fields["time_to_resolve"],
-            'timestep' => 1,
             'required'   => ($tt->isMandatoryField('time_to_resolve') && !$ID)
          ]
       );
@@ -890,14 +877,12 @@ class Change extends CommonITILObject {
          echo "<th>".__('Date of solving')."</th>";
          echo "<td>";
          Html::showDateTimeField("solvedate", ['value'      => $this->fields["solvedate"],
-                                                    'timestep'   => 1,
                                                     'maybeempty' => false]);
          echo "</td>";
          if (in_array($this->fields["status"], $this->getClosedStatusArray())) {
             echo "<th>".__('Closing date')."</th>";
             echo "<td>";
             Html::showDateTimeField("closedate", ['value'      => $this->fields["closedate"],
-                                                       'timestep'   => 1,
                                                        'maybeempty' => false]);
             echo "</td>";
          } else {
@@ -1182,9 +1167,10 @@ class Change extends CommonITILObject {
          }
 
          $this->showFormButtons($options);
+      } else {
+         echo "</table>";
+         echo "</div>";
       }
-      echo "</table>";
-      echo "</div>";
 
       return true;
 
@@ -1611,7 +1597,8 @@ class Change extends CommonITILObject {
          ],
          'WHERE'     => [
             'glpi_changes_items.itemtype' => $itemtype,
-            'glpi_changes_items.items_id' => $items_id,
+            'glpi_changes_items.items_id'    => $items_id,
+            $this->getTable() . '.is_deleted' => 0,
             'NOT'                         => [
                $this->getTable() . '.status' => array_merge(
                   $this->getSolvedStatusArray(),

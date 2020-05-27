@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2019 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -136,8 +136,9 @@ class Planning extends \DbTestCase {
       // Fetch all events
       $all_events = \Planning::constructEventsArray(
          [
-            'start' => '2000-01-01 00:00:00',
-            'end'   => '2050-12-31 23:59:59',
+            'start'            => '2000-01-01 00:00:00',
+            'end'              => '2050-12-31 23:59:59',
+            'force_all_events' => true
          ]
       );
       // Fetch events only for a given month

@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -44,38 +44,10 @@ if (substr(GLPI_VERSION, -4) === '-dev') {
    define("GLPI_SCHEMA_VERSION", '9.5.0');
 }
 define('GLPI_MIN_PHP', '7.2.0'); // Must also be changed in top of index.php
-define('GLPI_YEAR', '2019');
-if (!defined('GLPI_DEMO_MODE')) {
-   define('GLPI_DEMO_MODE', '0');
-}
-if (!defined('GLPI_USE_CSRF_CHECK')) {
-   define('GLPI_USE_CSRF_CHECK', '1');
-}
-if (!defined('GLPI_CSRF_EXPIRES')) {
-   define("GLPI_CSRF_EXPIRES", "7200");
-}
-if (!defined('GLPI_CSRF_MAX_TOKENS')) {
-   define("GLPI_CSRF_MAX_TOKENS", "100");
-}
-if (!defined('GLPI_SHOW_CENTRAL_WARNINGS')) {
-   define('GLPI_SHOW_CENTRAL_WARNINGS', '1');
-}
-if (!defined('GLPI_AJAX_DASHBOARD')) {
-   define('GLPI_AJAX_DASHBOARD', '1');
-}
+define('GLPI_YEAR', '2020');
+
 //Define a global recipient address for email notifications
 //define('GLPI_FORCE_MAIL', 'me@localhost');
-
-// for compatibility with mysql 5.7
-// TODO: this var need to be set to 0 after review of all sql queries)
-if (!defined('GLPI_FORCE_EMPTY_SQL_MODE')) {
-   define("GLPI_FORCE_EMPTY_SQL_MODE", "1");
-}
-
-// force mysql driver to retrieve int and float types correctly (and not convert them to strings)
-if (!defined('GLPI_FORCE_NATIVE_SQL_TYPES')) {
-   define("GLPI_FORCE_NATIVE_SQL_TYPES", "1");
-}
 
 // rights
 define("READ", 1);
@@ -162,16 +134,6 @@ define("NOT_AVAILABLE", 'N/A');
 // If you hav to define passwords again
 define("GLPIKEY", "GLPI£i'snarss'ç");
 
-//Telemetry
-if (!defined('GLPI_TELEMETRY_URI')) {
-   define('GLPI_TELEMETRY_URI', 'https://telemetry.glpi-project.org');
-}
-
-// GLPI Network
-if (!defined('GLPI_NETWORK_SERVICES')) {
-   define('GLPI_NETWORK_SERVICES', 'https://services.glpi-network.com');
-}
-
 // TIMES
 define("MINUTE_TIMESTAMP", 60);
 define("HOUR_TIMESTAMP", 3600);
@@ -204,12 +166,6 @@ define("ERROR_COMPAT", 3);
 define("ERROR_ON_ACTION", 4);
 define("ERROR_ALREADY_DEFINED", 5);
 
-// CALDAV BEHAVIORS
-if (!defined('CALDAV_IMPORT_STATE')) {
-   // external events created from a caldav client will take the following default state
-   define("CALDAV_IMPORT_STATE", 0); // Planning::INFO
-}
-
 // For plugins
 $PLUGIN_HOOKS     = [];
 $CFG_GLPI_PLUGINS = [];
@@ -219,12 +175,12 @@ $CFG_GLPI["unicity_types"]                = ['Budget', 'Computer', 'Contact', 'C
                                                   'Infocom', 'Monitor', 'NetworkEquipment',
                                                   'Peripheral', 'Phone', 'Printer', 'Software',
                                                   'SoftwareLicense', 'Supplier','User', 'Certicate',
-                                                  'Rack', 'Enclosure', 'PDU', 'Cluster'];
+                                                  'Rack', 'Enclosure', 'PDU', 'Cluster', 'Item_DeviceSimcard'];
 
 $CFG_GLPI["state_types"]                  = ['Computer', 'Monitor', 'NetworkEquipment',
                                                   'Peripheral', 'Phone', 'Printer', 'SoftwareLicense',
                                                   'Certificate', 'Enclosure', 'PDU', 'Line',
-                                                   'Rack', 'SoftwareVersion', 'Cluster'];
+                                                   'Rack', 'SoftwareVersion', 'Cluster', 'Contract'];
 
 $CFG_GLPI["asset_types"]                  = ['Computer', 'Monitor', 'NetworkEquipment',
                                                   'Peripheral', 'Phone', 'Printer', 'SoftwareLicense',
@@ -248,7 +204,7 @@ $CFG_GLPI["document_types"]               = ['Budget', 'CartridgeItem', 'Change'
                                                   'Reminder', 'Software', 'Line',
                                                   'SoftwareLicense', 'Supplier', 'Ticket','User',
                                                   'Certificate', 'Cluster', 'ITILFollowup', 'ITILSolution',
-                                                   'ChangeTask', 'ProblemTask', 'TicketTask'];
+                                                   'ChangeTask', 'ProblemTask', 'TicketTask', 'Appliance'];
 
 $CFG_GLPI["consumables_types"]            = ['Group', 'User'];
 
@@ -263,38 +219,38 @@ $CFG_GLPI["infocom_types"]                = ['Cartridge', 'CartridgeItem', 'Comp
                                                   'Consumable', 'ConsumableItem', 'Monitor',
                                                   'NetworkEquipment', 'Peripheral', 'Phone',
                                                   'Printer', 'Software', 'SoftwareLicense',
-                                                  'Line', 'Certificate', 'Domain'];
+                                                  'Line', 'Certificate', 'Domain', 'Appliance', 'Item_DeviceSimcard'];
 
 $CFG_GLPI["reservation_types"]            = ['Computer', 'Monitor', 'NetworkEquipment',
-                                                  'Peripheral', 'Phone', 'Printer', 'Software'];
+                                                  'Peripheral', 'Phone', 'Printer', 'Software', 'Item_DeviceSimcard'];
 
 $CFG_GLPI["linkuser_types"]               = ['Computer', 'Monitor', 'NetworkEquipment',
                                                   'Peripheral', 'Phone', 'Printer', 'Software',
-                                                  'SoftwareLicense', 'Certificate'];
+                                                  'SoftwareLicense', 'Certificate', 'Appliance', 'Item_DeviceSimcard'];
 
 $CFG_GLPI["linkgroup_types"]              = ['Computer', 'Consumable', 'Monitor', 'NetworkEquipment',
                                                   'Peripheral', 'Phone', 'Printer', 'Software',
-                                                  'SoftwareLicense', 'Certificate'];
+                                                  'SoftwareLicense', 'Certificate', 'Appliance', 'Item_DeviceSimcard'];
 
 $CFG_GLPI["linkuser_tech_types"]          = ['Computer', 'ConsumableItem', 'Monitor', 'NetworkEquipment',
                                                   'Peripheral', 'Phone', 'Printer', 'Software',
-                                                  'SoftwareLicense', 'Certificate'];
+                                                  'SoftwareLicense', 'Certificate', 'Appliance'];
 
 $CFG_GLPI["linkgroup_tech_types"]         = ['Computer', 'ConsumableItem', 'Monitor', 'NetworkEquipment',
                                                   'Peripheral', 'Phone', 'Printer', 'Software',
-                                                  'SoftwareLicense', 'Certificate'];
+                                                  'SoftwareLicense', 'Certificate', 'Appliance'];
 
 $CFG_GLPI["location_types"]               = ['Budget', 'CartridgeItem', 'ConsumableItem',
                                                   'Computer', 'Monitor', 'Netpoint',
                                                   'NetworkEquipment', 'Peripheral', 'Phone',
                                                   'Printer', 'Software', 'SoftwareLicense',
-                                                  'Ticket', 'User', 'Certificate'];
+                                                  'Ticket', 'User', 'Certificate', 'Item_DeviceSimcard'];
 
 $CFG_GLPI["ticket_types"]                 = ['Computer', 'Monitor', 'NetworkEquipment',
                                                   'Peripheral', 'Phone', 'Printer', 'Software',
                                                   'SoftwareLicense', 'Certificate',
                                                   'Line', 'DCRoom', 'Rack', 'Enclosure', 'Cluster', 'PDU',
-                                                  'Domain', 'DomainRecord'];
+                                                  'Domain', 'DomainRecord', 'Appliance', 'Item_DeviceSimcard'];
 
 $CFG_GLPI["link_types"]                   = ['Budget', 'CartridgeItem', 'Computer',
                                                   'ConsumableItem', 'Contact', 'Contract', 'Monitor',
@@ -313,7 +269,7 @@ $CFG_GLPI["dictionnary_types"]            = ['ComputerModel', 'ComputerType', 'M
                                                   'OperatingSystemKernel', 'OperatingSystemKernelVersion',
                                                   'OperatingSystemEdition'];
 
-$CFG_GLPI["helpdesk_visible_types"]       = ['Software'];
+$CFG_GLPI["helpdesk_visible_types"]       = ['Software', 'Appliance', 'Item_DeviceSimcard'];
 
 $CFG_GLPI["networkport_types"]            = ['Computer', 'NetworkEquipment', 'Peripheral',
                                                   'Phone', 'Printer', 'Enclosure', 'PDU', 'Cluster'];
@@ -333,6 +289,7 @@ $CFG_GLPI['device_types']                 = ['DeviceMotherboard', 'DeviceFirmwar
 
 $CFG_GLPI['itemdevices'] = [];
 foreach ($CFG_GLPI['device_types'] as $dtype) {
+   $CFG_GLPI['location_types'][] = 'Item_' . $dtype;
    $CFG_GLPI["itemdevices"][] = 'Item_' . $dtype;
 }
 
@@ -380,7 +337,7 @@ $CFG_GLPI["notificationtemplates_types"]  = ['CartridgeItem', 'Change', 'Consuma
 $CFG_GLPI["contract_types"]               = array_merge(['Computer', 'Monitor', 'NetworkEquipment',
                                                   'Peripheral', 'Phone', 'Printer', 'Project', 'Line',
                                                   'Software', 'SoftwareLicense', 'Certificate',
-                                                  'DCRoom', 'Rack', 'Enclosure', 'Cluster', 'PDU'],
+                                                  'DCRoom', 'Rack', 'Enclosure', 'Cluster', 'PDU', 'Appliance'],
                                                   $CFG_GLPI['itemdevices']);
 
 
@@ -478,7 +435,7 @@ $CFG_GLPI["certificate_types"]     = ['Computer',
                                       'Phone', 'Printer',
                                       'SoftwareLicense', 'User'];
 
-$CFG_GLPI["rackable_types"]        = ['Computer', 'Monitor', 'NetworkEquipment', 'Peripheral', 'Enclosure', 'PDU'];
+$CFG_GLPI["rackable_types"]        = ['Computer', 'Monitor', 'NetworkEquipment', 'Peripheral', 'Enclosure', 'PDU', 'PassiveDCEquipment'];
 
 $CFG_GLPI["cluster_types"]        = ['Computer', 'NetworkEquipment'];
 
@@ -489,10 +446,13 @@ $CFG_GLPI['software_types']      = ['Computer', 'Phone'];
 $CFG_GLPI['kanban_types']        = ['Project'];
 
 $CFG_GLPI['domain_types']        = ['Computer', 'Monitor', 'NetworkEquipment', 'Peripheral',
-                                       'Phone', 'Printer', 'Software'];
+                                       'Phone', 'Printer', 'Software', 'Appliance'];
+
+$CFG_GLPI['appliance_types']     = ['Computer', 'Monitor', 'NetworkEquipment', 'Peripheral', 'Phone',
+                                       'Printer', 'Software', 'Cluster'];
 
 $dashboard_libs = [
-   'dashboard', 'colorpicker', 'gridstack',
+   'dashboard', 'gridstack',
    'charts', 'clipboard'
 ];
 
@@ -500,62 +460,96 @@ $CFG_GLPI['javascript'] = [
    'central'   => [
       'central' => array_merge([
          'fullcalendar',
+         'planning',
          'tinymce',
       ], $dashboard_libs)
    ],
    'assets'    => [
       'dashboard' => $dashboard_libs,
-      'rack'      => ['colorpicker', 'gridstack', 'rack']
+      'rack'      => ['gridstack', 'rack']
    ],
    'helpdesk'  => [
       'dashboard' => $dashboard_libs,
-      'planning'  => ['clipboard', 'fullcalendar', 'colorpicker', 'tinymce', 'planning'],
+      'planning'  => ['clipboard', 'fullcalendar', 'tinymce', 'planning'],
       'ticket'    => array_merge(['rateit', 'tinymce', 'photoswipe'], $dashboard_libs),
       'problem'   => ['tinymce', 'photoswipe'],
       'change'    => ['tinymce', 'photoswipe'],
       'stat'      => ['charts']
    ],
    'tools'     => [
-      'project'      => ['gantt', 'kanban', 'colorpicker'],
+      'project'      => ['gantt', 'kanban'],
       'knowbaseitem' => ['tinymce', 'jstree'],
       'reminder'     => ['tinymce'],
-      'impact'       => ['colorpicker']
    ],
    'management' => [
       'datacenter' => [
-         'dcroom' => ['colorpicker', 'gridstack', 'rack']
+         'dcroom' => ['gridstack', 'rack']
       ]
    ],
    'config' => [
-      'config' => ['colorpicker'],
       'commondropdown'  => [
          'ITILFollowupTemplate'  => ['tinymce'],
-         'PlanningEventCategory' => ['colorpicker'],
-         'ProjectState'          => ['colorpicker'],
          'SolutionTemplate'      => ['tinymce'],
       ],
       'notification' => [
          'notificationtemplate' => ['tinymce']
+      ],
+      'plugin'=> [
+         'marketplace' => ['marketplace']
       ]
    ],
-   'admin'        => ['colorpicker', 'clipboard'],
-   'preference'   => ['colorpicker', 'clipboard'],
-   'self-service' => ['colorpicker', 'tinymce']
+   'admin'        => ['clipboard'],
+   'preference'   => ['clipboard'],
+   'self-service' => ['tinymce']
 ];
 
 //Maximum time, in miliseconds a saved search should not exeed
 //so we count it on display (using automatic mode).
 $CFG_GLPI['max_time_for_count'] = 200;
 
-$CFG_GLPI["impact_asset_types"]  = [
-   'Computer'         => "pics/impact/computer.png",
-   'Monitor'          => "pics/impact/monitor.png",
-   'NetworkEquipment' => "pics/impact/networkequipment.png",
-   'Peripheral'       => "pics/impact/peripheral.png",
-   'Phone'            => "pics/impact/phone.png",
-   'Printer'          => "pics/impact/printer.png",
-   'Software'         => "pics/impact/software.png",
-   'DCRoom'           => "pics/impact/dcroom.png",
-   'Rack'             => "pics/impact/rack.png",
-   'Enclosure'        => "pics/impact/enclosure.png"
+/**
+ * Impact itemtypes enabled by default
+ */
+$CFG_GLPI["default_impact_asset_types"] = [
+   Appliance::getType()          => "pics/impact/appliance.png",
+   Cluster::getType()            => "pics/impact/cluster.png",
+   Computer::getType()           => "pics/impact/computer.png",
+   Datacenter::getType()         => "pics/impact/datacenter.png",
+   DCRoom::getType()             => "pics/impact/dcroom.png",
+   Domain::getType()             => "pics/impact/domain.png",
+   Enclosure::getType()          => "pics/impact/enclosure.png",
+   Monitor::getType()            => "pics/impact/monitor.png",
+   NetworkEquipment::getType()   => "pics/impact/networkequipment.png",
+   PDU::getType()                => "pics/impact/pdu.png",
+   Peripheral::getType()         => "pics/impact/peripheral.png",
+   Phone::getType()              => "pics/impact/phone.png",
+   Printer::getType()            => "pics/impact/printer.png",
+   Rack::getType()               => "pics/impact/rack.png",
+   Software::getType()           => "pics/impact/software.png",
+];
+
+/**
+ * All possible impact itemtypes: default + extra itemtypes that can be
+ * added in GLPI configuration
+ */
+$CFG_GLPI["impact_asset_types"] = $CFG_GLPI["default_impact_asset_types"] + [
+   Authldap::getType()           => "pics/impact/authldap.png",
+   CartridgeItem::getType()      => "pics/impact/cartridgeitem.png",
+   Contract::getType()           => "pics/impact/contract.png",
+   Crontask::getType()           => "pics/impact/crontask.png",
+   DeviceSimcard::getType()      => "pics/impact/devicesimcard.png",
+   Entity::getType()             => "pics/impact/entity.png",
+   Group::getType()              => "pics/impact/group.png",
+   ITILCategory::getType()       => "pics/impact/itilcategory.png",
+   Line::getType()               => "pics/impact/line.png",
+   Location::getType()           => "pics/impact/location.png",
+   Mailcollector::getType()      => "pics/impact/mailcollector.png",
+   Notification::getType()       => "pics/impact/notification.png",
+   Profile::getType()            => "pics/impact/profile.png",
+   Project::getType()            => "pics/impact/project.png",
+   Rack::getType()               => "pics/impact/rack.png",
+   SLM::getType()                => "pics/impact/slm.png",
+   Softwarelicense::getType()    => "pics/impact/softwarelicense.png",
+   Supplier::getType()           => "pics/impact/supplier.png",
+   User::getType()               => "pics/impact/user.png",
 ];

@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2019 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -125,7 +125,7 @@ class Dashboard extends DbTestCase {
    public function testClone() {
       $clone_name = sprintf(__('Copy of %s'), "Test_Dashboard");
       $clone_key  = \Toolbox::slugify($clone_name);
-      $this->array($this->dashboard->clone())->isEqualTo([
+      $this->array($this->dashboard->cloneCurrent())->isEqualTo([
          'title' => $clone_name,
          'key'   => $clone_key
       ]);
@@ -147,9 +147,10 @@ class Dashboard extends DbTestCase {
 
 
    public function testGetAll() {
+      // get "core" dashboards
       $dasboards = $this->dashboard::getAll(true, false);
       $this->array($dasboards)
-         ->hasSize(2)
+         ->hasSize(5)
          ->hasKey('test_dashboard')
          ->hasKey('test_dashboard2');
 

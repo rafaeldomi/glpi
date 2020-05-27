@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -999,13 +999,23 @@ function update94to95() {
       \Glpi\Dashboard\Dashboard::importFromJson($dashboards);
       Config::deleteConfigurationValues('core', ['dashboards']);
    }
+
+   //delete prevous dashboards configuration (remove partial dev versions)
+   Config::deleteConfigurationValues('core', [
+      'default_dashboard_central',
+      'default_dashboard_assets',
+      'default_dashboard_helpdesk',
+      'default_dashboard_mini_ticket',
+   ]);
+
    // add default dashboards
    $migration->addConfig([
       'default_dashboard_central'     => 'central',
       'default_dashboard_assets'      => 'assets',
-      'default_dashboard_helpdesk'    => 'helpdesk',
-      'default_dashboard_mini_ticket' => 'mini_ticket',
+      'default_dashboard_helpdesk'    => 'assistance',
+      'default_dashboard_mini_ticket' => 'mini_tickets',
    ]);
+
    if (!$DB->fieldExists('glpi_users', 'default_dashboard_central')) {
       $migration->addField("glpi_users", "default_dashboard_central", "varchar(100) DEFAULT NULL");
    }
@@ -1017,6 +1027,48 @@ function update94to95() {
    }
    if (!$DB->fieldExists('glpi_users', 'default_dashboard_mini_ticket')) {
       $migration->addField("glpi_users", "default_dashboard_mini_ticket", "varchar(100) DEFAULT NULL");
+   }
+
+   // default dashboards
+   if (countElementsInTable("glpi_dashboards_dashboards") === 0) {
+      $dashboard_obj   = new \Glpi\Dashboard\Dashboard();
+      $dashboards_data = include_once __DIR__."/update_94_95/dashboards.php";
+      foreach ($dashboards_data as $default_dashboard) {
+         $items = $default_dashboard['_items'];
+         unset($default_dashboard['_items']);
+
+         // add current dashboard
+         $dashboard_id = $dashboard_obj->add($default_dashboard);
+
+         // add items to this new dashboard
+         $query = $DB->buildInsert(
+            \Glpi\Dashboard\Item::getTable(),
+            [
+               'dashboards_dashboards_id' => new QueryParam(),
+               'gridstack_id'             => new QueryParam(),
+               'card_id'                  => new QueryParam(),
+               'x'                        => new QueryParam(),
+               'y'                        => new QueryParam(),
+               'width'                    => new QueryParam(),
+               'height'                   => new QueryParam(),
+               'card_options'             => new QueryParam(),
+            ]
+         );
+         $stmt = $DB->prepare($query);
+         foreach ($items as $item) {
+            $stmt->bind_param('issiiiis',
+               $dashboard_id,
+               $item['gridstack_id'],
+               $item['card_id'],
+               $item['x'],
+               $item['y'],
+               $item['width'],
+               $item['height'],
+               $item['card_options']
+            );
+            $stmt->execute();
+         }
+      }
    }
    /** /Dashboards */
 
@@ -1207,7 +1259,6 @@ function update94to95() {
             `is_recursive` tinyint(1) NOT NULL DEFAULT '0',
             `domains_id` int(11) NOT NULL DEFAULT '0',
             `domainrecordtypes_id` int(11) NOT NULL DEFAULT '0',
-            `status` tinyint(1) NOT NULL,
             `ttl` int(11) NOT NULL,
             `users_id_tech` int(11) NOT NULL DEFAULT '0',
             `groups_id_tech` int(11) NOT NULL DEFAULT '0',
@@ -1217,7 +1268,6 @@ function update94to95() {
             `date_creation` timestamp NULL DEFAULT NULL,
             PRIMARY KEY (`id`),
             KEY `name` (`name`),
-            KEY `status` (`status`),
             KEY `entities_id` (`entities_id`),
             KEY `domains_id` (`domains_id`),
             KEY `domainrecordtypes_id` (`domainrecordtypes_id`),
@@ -1229,6 +1279,11 @@ function update94to95() {
          ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci";
       $DB->queryOrDie($query, "add table glpi_domainrecords");
    }
+
+   if ($DB->fieldExists('glpi_domainrecords', 'status')) {
+      $migration->dropField('glpi_domainrecords', 'status');
+   }
+
    /** /Domain records */
 
    /** Domains expiration notifications */
@@ -1412,6 +1467,10 @@ HTML
       }
    }
    /** /A doc_item to rule them all! */
+
+   /** Appliances & webapps */
+   require __DIR__ . '/update_94_95/appliances.php';
+   /** /Appliances & webapps */
 
    // ************ Keep it at the end **************
    foreach ($ADDTODISPLAYPREF as $type => $tab) {
@@ -1657,6 +1716,90 @@ HTML
    }
    /** /Update default right assignement rule */
 
+   /** Passive Datacenter equipments */
+   if (!$DB->tableExists('glpi_passivedcequipments')) {
+      $query = "CREATE TABLE `glpi_passivedcequipments` (
+         `id` int(11) NOT NULL AUTO_INCREMENT,
+         `name` varchar(255) COLLATE utf8_unicode_ci DEFAULT NULL,
+         `entities_id` int(11) NOT NULL DEFAULT '0',
+         `is_recursive` tinyint(1) NOT NULL DEFAULT '0',
+         `locations_id` int(11) NOT NULL DEFAULT '0',
+         `serial` varchar(255) COLLATE utf8_unicode_ci DEFAULT NULL,
+         `otherserial` varchar(255) COLLATE utf8_unicode_ci DEFAULT NULL,
+         `passivedcequipmentmodels_id` int(11) DEFAULT NULL,
+         `passivedcequipmenttypes_id` int(11) NOT NULL DEFAULT '0',
+         `users_id_tech` int(11) NOT NULL DEFAULT '0',
+         `groups_id_tech` int(11) NOT NULL DEFAULT '0',
+         `is_template` tinyint(1) NOT NULL DEFAULT '0',
+         `template_name` varchar(255) COLLATE utf8_unicode_ci DEFAULT NULL,
+         `is_deleted` tinyint(1) NOT NULL DEFAULT '0',
+         `states_id` int(11) NOT NULL DEFAULT '0' COMMENT 'RELATION to states (id)',
+         `comment` text COLLATE utf8_unicode_ci,
+         `manufacturers_id` int(11) NOT NULL DEFAULT '0',
+         `date_mod` timestamp NULL DEFAULT NULL,
+         `date_creation` timestamp NULL DEFAULT NULL,
+         PRIMARY KEY (`id`),
+         KEY `entities_id` (`entities_id`),
+         KEY `is_recursive` (`is_recursive`),
+         KEY `locations_id` (`locations_id`),
+         KEY `passivedcequipmentmodels_id` (`passivedcequipmentmodels_id`),
+         KEY `passivedcequipmenttypes_id` (`passivedcequipmenttypes_id`),
+         KEY `users_id_tech` (`users_id_tech`),
+         KEY `group_id_tech` (`groups_id_tech`),
+         KEY `is_template` (`is_template`),
+         KEY `is_deleted` (`is_deleted`),
+         KEY `states_id` (`states_id`),
+         KEY `manufacturers_id` (`manufacturers_id`)
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;";
+      $DB->queryOrDie($query, "add table glpi_passivedcequipments");
+   }
+   if (!$DB->tableExists('glpi_passivedcequipmentmodels')) {
+      $query = "CREATE TABLE `glpi_passivedcequipmentmodels` (
+         `id` int(11) NOT NULL AUTO_INCREMENT,
+         `name` varchar(255) COLLATE utf8_unicode_ci DEFAULT NULL,
+         `comment` text COLLATE utf8_unicode_ci,
+         `product_number` varchar(255) COLLATE utf8_unicode_ci DEFAULT NULL,
+         `weight` int(11) NOT NULL DEFAULT '0',
+         `required_units` int(11) NOT NULL DEFAULT '1',
+         `depth` float NOT NULL DEFAULT 1,
+         `power_connections` int(11) NOT NULL DEFAULT '0',
+         `power_consumption` int(11) NOT NULL DEFAULT '0',
+         `is_half_rack` tinyint(1) NOT NULL DEFAULT '0',
+         `picture_front` text COLLATE utf8_unicode_ci,
+         `picture_rear` text COLLATE utf8_unicode_ci,
+         `date_mod` timestamp NULL DEFAULT NULL,
+         `date_creation` timestamp NULL DEFAULT NULL,
+         PRIMARY KEY (`id`),
+         KEY `name` (`name`),
+         KEY `date_mod` (`date_mod`),
+         KEY `date_creation` (`date_creation`),
+         KEY `product_number` (`product_number`)
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;";
+      $DB->queryOrDie($query, "add table glpi_passivedcequipmentmodels");
+   }
+   if (!$DB->tableExists('glpi_passivedcequipmenttypes')) {
+      $query = "CREATE TABLE `glpi_passivedcequipmenttypes` (
+         `id` int(11) NOT NULL AUTO_INCREMENT,
+         `name` varchar(255) COLLATE utf8_unicode_ci DEFAULT NULL,
+         `comment` text COLLATE utf8_unicode_ci,
+         `date_mod` timestamp NULL DEFAULT NULL,
+         `date_creation` timestamp NULL DEFAULT NULL,
+         PRIMARY KEY (`id`),
+         KEY `name` (`name`),
+         KEY `date_mod` (`date_mod`),
+         KEY `date_creation` (`date_creation`)
+       ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;";
+      $DB->queryOrDie($query, "add table glpi_passivedcequipmenttypes");
+   }
+   if (!$DB->fieldExists('glpi_states', 'is_visible_passivedcequipment')) {
+      $migration->addField('glpi_states', 'is_visible_passivedcequipment', 'bool', [
+         'value' => 1,
+         'after' => 'is_visible_rack'
+      ]);
+      $migration->addKey('glpi_states', 'is_visible_passivedcequipment');
+   }
+   /** /Passive Datacenter equipments */
+
    if (!$DB->fieldExists('glpi_profiles', 'managed_domainrecordtypes')) {
       $migration->addField(
          'glpi_profiles',
@@ -1677,6 +1820,74 @@ HTML
          ]
       )
    );
+
+   // Add anonymize_support_agents to entity
+   if (!$DB->fieldExists("glpi_entities", "anonymize_support_agents")) {
+      $migration->addField(
+         "glpi_entities",
+         "anonymize_support_agents",
+         "integer",
+         [
+            'after'     => "suppliers_as_private",
+            'value'     => -2,               // Inherit as default value
+            'update'    => '0',              // Not enabled for root entity
+            'condition' => 'WHERE `id` = 0'
+         ]
+      );
+   }
+
+   /**  Add default impact itemtypes */
+   $impact_default = exportArrayToDB(Impact::getDefaultItemtypes());
+   $migration->addConfig([Impact::CONF_ENABLED => $impact_default]);
+   /**  /Add default impact itemtypes */
+
+   /** Appliances & webapps */
+   require __DIR__ . '/update_94_95/appliances.php';
+   /** /Appliances & webapps */
+
+   // ************ Keep it at the end **************
+   foreach ($ADDTODISPLAYPREF as $type => $tab) {
+      $rank = 1;
+      foreach ($tab as $newval) {
+         $DB->updateOrInsert("glpi_displaypreferences", [
+            'rank'      => $rank++
+         ], [
+            'users_id'  => "0",
+            'itemtype'  => $type,
+            'num'       => $newval,
+         ]);
+      }
+   }
+
+   // Add new field states in contract
+   if (!$DB->fieldExists('glpi_states', 'is_visible_contract')) {
+      $migration->addField('glpi_states', 'is_visible_contract', 'bool', [
+         'value' => 1,
+         'after' => 'is_visible_cluster'
+      ]);
+      $migration->addKey('glpi_states', 'is_visible_contract');
+   }
+
+   if (!$DB->fieldExists('glpi_contracts', 'states_id')) {
+      $migration->addField('glpi_contracts', 'states_id', 'int', [
+         'value' => 0,
+         'after' => 'is_template'
+      ]);
+      $migration->addKey('glpi_contracts', 'states_id');
+   }
+
+   // No-reply notifications
+   if (!$DB->fieldExists(Notification::getTable(), 'allow_response')) {
+      $migration->addField(Notification::getTable(), 'allow_response', 'bool', [
+         'value' => 1
+      ]);
+   }
+
+   $migration->addConfig([
+      'admin_email_noreply'      => "",
+      'admin_email_noreply_name' => "",
+   ]);
+   // /No-reply notifications
 
    $migration->executeMigration();
 

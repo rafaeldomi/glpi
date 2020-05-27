@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -746,6 +746,7 @@ class Computer_Item extends CommonDBRelation{
    /**
     * Duplicate connected items to computer from an item template to its clone
     *
+    * @deprecated 9.5
     * @since 0.84
     *
     * @param integer $oldid ID of the item to clone
@@ -754,6 +755,7 @@ class Computer_Item extends CommonDBRelation{
    static function cloneComputer($oldid, $newid) {
       global $DB;
 
+      Toolbox::deprecated('Use clone');
       $iterator = $DB->request([
          'FROM'   => self::getTable(),
          'WHERE'  => ['computers_id' => $oldid]
@@ -771,6 +773,7 @@ class Computer_Item extends CommonDBRelation{
    /**
     * Duplicate connected items to item from an item template to its clone
     *
+    * @deprecated 9.5
     * @since 0.83.3
     *
     * @param string  $itemtype type of the item to clone
@@ -780,6 +783,7 @@ class Computer_Item extends CommonDBRelation{
    static function cloneItem($itemtype, $oldid, $newid) {
       global $DB;
 
+      Toolbox::deprecated('Use clone');
       $iterator = $DB->request([
          'FROM'   => self::getTable(),
          'WHERE'  => [

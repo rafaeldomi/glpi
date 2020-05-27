@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -243,7 +243,7 @@ trait VobjectConverterTrait {
 
       $input['rrule'] = $this->getRRuleInputFromVComponent($vcomponent);
 
-      $state = CALDAV_IMPORT_STATE;
+      $state = GLPI_CALDAV_IMPORT_STATE;
       if ($vcomponent instanceof VTodo) {
          $state = $this->getStateInputFromVComponent($vcomponent) ?? $state;
       }

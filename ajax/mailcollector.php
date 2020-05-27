@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -52,12 +52,13 @@ if (isset($_REQUEST['action'])) {
 
          // Update fields with input values
          $input = $_REQUEST;
+         $input['login'] = stripslashes($input['login']);
 
          if (isset($input["passwd"])) {
             if (empty($input["passwd"])) {
                unset($input["passwd"]);
             } else {
-               $input["passwd"] = Toolbox::encrypt(stripslashes($input["passwd"]), GLPIKEY);
+               $input["passwd"] = Toolbox::sodiumEncrypt(stripslashes($input["passwd"]));
             }
          }
 

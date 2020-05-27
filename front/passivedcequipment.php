@@ -1,7 +1,8 @@
+<?php
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -29,6 +30,17 @@
  * ---------------------------------------------------------------------
  */
 
-// Spectrum colorpicker jQuery plugin
-require('spectrum-colorpicker');
-require('spectrum-colorpicker/spectrum.css');
+include ('../inc/includes.php');
+
+Session::checkRight("datacenter", READ);
+
+Html::header(
+   PassiveDCEquipment::getTypeName(Session::getPluralNumber()),
+   $_SERVER['PHP_SELF'],
+   "assets",
+   "passivedcequipment"
+);
+
+Search::show('PassiveDCEquipment');
+
+Html::footer();

@@ -1,7 +1,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2019 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -109,7 +109,7 @@ var GLPIImpact = {
    // The graph edition mode
    editionMode: null,
 
-   // Start node of the graph
+   // Start node of the graph (id)
    startNode: null,
 
    // Maximum depth of the graph (default 5)
@@ -263,7 +263,6 @@ var GLPIImpact = {
          case this.ACTION_ADD_EDGE:
             this.cy.remove("edge" + this.makeIDSelector(data.id));
             this.updateFlags();
-            this.refreshVisiblity();
             break;
 
          // Delete compound
@@ -275,7 +274,6 @@ var GLPIImpact = {
             });
             this.cy.remove("node" + this.makeIDSelector(data.data.id));
             this.updateFlags();
-            this.refreshVisiblity();
             break;
 
          // Remove the newly added graph
@@ -303,7 +301,6 @@ var GLPIImpact = {
             });
 
             this.updateFlags();
-            this.refreshVisiblity();
 
             break;
 
@@ -374,7 +371,6 @@ var GLPIImpact = {
             });
 
             this.updateFlags();
-            this.refreshVisiblity();
 
             break;
 
@@ -402,8 +398,7 @@ var GLPIImpact = {
             this.setEdgeColors({
                backward: data.oldColor,
             });
-            $(GLPIImpact.selectors.dependsColor).spectrum(
-               "set",
+            $(GLPIImpact.selectors.dependsColor).val(
                GLPIImpact.edgeColors[GLPIImpact.BACKWARD]
             );
             this.updateStyle();
@@ -416,8 +411,7 @@ var GLPIImpact = {
             this.setEdgeColors({
                forward: data.oldColor,
             });
-            $(GLPIImpact.selectors.impactColor).spectrum(
-               "set",
+            $(GLPIImpact.selectors.impactColor).val(
                GLPIImpact.edgeColors[GLPIImpact.FORWARD]
             );
             this.updateStyle();
@@ -430,8 +424,7 @@ var GLPIImpact = {
             this.setEdgeColors({
                both: data.oldColor,
             });
-            $(GLPIImpact.selectors.impactAndDependsColor).spectrum(
-               "set",
+            $(GLPIImpact.selectors.impactAndDependsColor).val(
                GLPIImpact.edgeColors[GLPIImpact.BOTH]
             );
             this.updateStyle();
@@ -498,7 +491,6 @@ var GLPIImpact = {
                data: data,
             });
             this.updateFlags();
-            this.refreshVisiblity();
 
             break;
 
@@ -514,7 +506,6 @@ var GLPIImpact = {
                   .move({parent: data.data.id});
             });
             this.updateFlags();
-            this.refreshVisiblity();
 
             break;
 
@@ -553,7 +544,6 @@ var GLPIImpact = {
             });
 
             this.updateFlags();
-            this.refreshVisiblity();
 
             break;
 
@@ -611,7 +601,6 @@ var GLPIImpact = {
             });
 
             this.updateFlags();
-            this.refreshVisiblity();
 
             break;
 
@@ -639,8 +628,7 @@ var GLPIImpact = {
             this.setEdgeColors({
                backward: data.newColor,
             });
-            $(GLPIImpact.selectors.dependsColor).spectrum(
-               "set",
+            $(GLPIImpact.selectors.dependsColor).val(
                GLPIImpact.edgeColors[GLPIImpact.BACKWARD]
             );
             this.updateStyle();
@@ -653,7 +641,7 @@ var GLPIImpact = {
             this.setEdgeColors({
                forward: data.newColor,
             });
-            $(GLPIImpact.selectors.forwardColor).spectrum(
+            $(GLPIImpact.selectors.forwardColor).val(
                "set",
                GLPIImpact.edgeColors[GLPIImpact.FORWARD]
             );
@@ -667,8 +655,7 @@ var GLPIImpact = {
             this.setEdgeColors({
                both: data.newColor,
             });
-            $(GLPIImpact.selectors.impactAndDependsColor).spectrum(
-               "set",
+            $(GLPIImpact.selectors.impactAndDependsColor).val(
                GLPIImpact.edgeColors[GLPIImpact.BOTH]
             );
             this.updateStyle();
@@ -686,6 +673,35 @@ var GLPIImpact = {
       if (this.redoStack.length === 0) {
          $(this.selectors.redo).addClass("impact-disabled");
       }
+   },
+
+   /**
+    * Selector for nodes to hide according to depth and flag settings
+    */
+   getHiddenSelector: function() {
+      var depthSelector = '[depth > ' + this.maxDepth + '][depth !> ' + Number.MAX_SAFE_INTEGER + ']';
+      var flagSelector;
+
+      // We have to compute the flags ourselves as bit comparison operators are
+      // not supported by cytoscape selectors
+      var forward = this.directionVisibility[this.FORWARD];
+      var backward = this.directionVisibility[this.BACKWARD];
+
+      if (forward && backward) {
+         // Hide nothing
+         flagSelector = "[flag = -1]";
+      } else if (forward && !backward) {
+         // Hide backward
+         flagSelector = "[flag = " + this.BACKWARD + "]";
+      } else if (!forward && backward) {
+         // Hide forward
+         flagSelector = "[flag = " + this.FORWARD + "]";
+      } else {
+         // Hide all but start node and not connected nodes
+         flagSelector = '[flag != 0]';
+      }
+
+      return flagSelector + ', ' + depthSelector;
    },
 
    /**
@@ -765,7 +781,7 @@ var GLPIImpact = {
             }
          },
          {
-            selector: '[hidden=1], [depth > ' + this.maxDepth + ']',
+            selector: GLPIImpact.getHiddenSelector(),
             style: {
                'display': 'none',
             }
@@ -773,7 +789,9 @@ var GLPIImpact = {
          {
             selector: '[id="tmp_node"]',
             style: {
-               'display': 'none',
+               // Use opacity instead of display none here as this will make
+               // the edges connected to this node still visible
+               'opacity': 0,
             }
          },
          {
@@ -789,6 +807,17 @@ var GLPIImpact = {
                'target-endpoint'          : 'outside-to-node-or-label',
                'source-distance-from-node': '2px',
                'target-distance-from-node': '2px',
+            }
+         },
+         {
+            selector: 'edge[target="tmp_node"]',
+            style: {
+               // We want the arrow to go exactly where the cursor of the user
+               // is on the graph, no padding.
+               'source-endpoint'          : 'inside-to-node',
+               'target-endpoint'          : 'inside-to-node',
+               'source-distance-from-node': '0px',
+               'target-distance-from-node': '0px',
             }
          },
          {
@@ -1279,7 +1308,7 @@ var GLPIImpact = {
             id             : 'goTo',
             content        : '<i class="fas fa-link"></i>' + __("Go to"),
             tooltipText    : __("Open this element in a new tab"),
-            selector       : 'node[!color]',
+            selector       : 'node[link]',
             onClickFunction: this.menuOnGoTo
          },
          {
@@ -1341,8 +1370,6 @@ var GLPIImpact = {
                   y: position.y
                });
                GLPIImpact.updateFlags();
-               GLPIImpact.refreshVisiblity();
-
             }
          ).fail(
             function () {
@@ -1384,7 +1411,7 @@ var GLPIImpact = {
       var previousColor = compound.data('color');
       // Reset inputs:
       $(GLPIImpact.selectors.compoundName).val(previousLabel);
-      $(GLPIImpact.selectors.compoundColor).spectrum("set", previousColor);
+      $(GLPIImpact.selectors.compoundColor).val(previousColor);
 
       // Save group details
       var buttonSave = {
@@ -1570,7 +1597,6 @@ var GLPIImpact = {
             $(GLPIImpact.selectors.toggleDepends).prop("checked", false);
          }
          this.updateFlags();
-         this.refreshVisiblity();
 
          // Set viewport
          if (params.zoom != '0') {
@@ -1656,16 +1682,13 @@ var GLPIImpact = {
       $(GLPIImpact.selectors.maxDepth).val(GLPIImpact.maxDepth);
 
       // Set color widgets default values
-      $(GLPIImpact.selectors.dependsColor).spectrum(
-         "set",
+      $(GLPIImpact.selectors.dependsColor).val(
          GLPIImpact.edgeColors[GLPIImpact.BACKWARD]
       );
-      $(GLPIImpact.selectors.impactColor).spectrum(
-         "set",
+      $(GLPIImpact.selectors.impactColor).val(
          GLPIImpact.edgeColors[GLPIImpact.FORWARD]
       );
-      $(GLPIImpact.selectors.impactAndDependsColor).spectrum(
-         "set",
+      $(GLPIImpact.selectors.impactAndDependsColor).val(
          GLPIImpact.edgeColors[GLPIImpact.BOTH]
       );
    },
@@ -1739,30 +1762,107 @@ var GLPIImpact = {
    },
 
    /**
-    * Update the flags of the edges of the graph
-    * Explore the graph forward then backward
+    * Compute flags and depth for each nodes
     */
    updateFlags: function() {
-      // Keep track of visited nodes
-      var exploredNodes;
+      /**
+       * Assuming A is our starting node and B is a random node on the graph,
+       * the depth of B is the shortest distance between AB and BA.
+       */
 
-      // Set all flag to the default value (0)
-      this.cy.edges().forEach(function(edge) {
-         edge.data("flag", 0);
+      // Init flag to GLPIImpact.DEFAULT for all elements of the graph
+      this.cy.elements().forEach(function(ele) {
+         ele.data('flag', GLPIImpact.DEFAULT);
       });
-      this.cy.nodes().data("depth", 0);
 
-      // Run through the graph forward
-      exploredNodes = {};
-      exploredNodes[this.startNode] = true;
-      this.exploreGraph(exploredNodes, GLPIImpact.FORWARD, this.startNode, 0);
+      // First, calculate AB: Apply dijkstra on A and get distances for each
+      // nodes
+      var startNodeDijkstra = this.cy.elements().dijkstra(
+         this.makeIDSelector(this.startNode),
+         function() { return 1; }, // Same weight for each path
+         true                      // Do not ignore edge directions
+      );
 
-      // Run through the graph backward
-      exploredNodes = {};
-      exploredNodes[this.startNode] = true;
-      this.exploreGraph(exploredNodes, GLPIImpact.BACKWARD, this.startNode, 0);
+      this.cy.$("node:childless").forEach(function(node) {
+         var distanceAB = startNodeDijkstra.distanceTo(node);
+         node.data('depth', distanceAB);
 
-      this.updateStyle();
+         // Set node as part of the "Forward" graph
+         if (distanceAB !== Infinity) {
+            node.data('flag', node.data('flag') | GLPIImpact.FORWARD);
+         }
+      });
+
+      // Now, calculate BA: apply dijkstra on each nodes of the graph and
+      // get the distance to A
+      this.cy.$("node:childless").forEach(function(node) {
+         // Skip A
+         if (node.data('id') == GLPIImpact.startNode) {
+            return;
+         }
+
+         var otherNodeDijkstra = GLPIImpact.cy.elements().dijkstra(
+            node,
+            function() { return 1; }, // Same weight for each path
+            true                      // Do not ignore edge directions
+         );
+
+         var distanceBA = otherNodeDijkstra.distanceTo(
+            GLPIImpact.makeIDSelector(GLPIImpact.startNode)
+         );
+
+         // If distance BA is shorter than distance AB, use it instead
+         if (node.data('depth') > distanceBA) {
+            node.data('depth', distanceBA);
+         }
+
+         // Set node as part of the "Backward" graph
+         if (distanceBA !== Infinity) {
+            node.data('flag', node.data('flag') | GLPIImpact.BACKWARD);
+         }
+      });
+
+      // Set start node to this.BOTH so it doen't impact the computation of it's neighbors
+      GLPIImpact.cy.$(GLPIImpact.makeIDSelector(GLPIImpact.startNode)).data(
+         'flag',
+         this.BOTH
+      );
+
+      // Handle compounds nodes, their depth should be the lowest depth amongst
+      // their children
+      this.cy.filter("node:parent").forEach(function(compound) {
+         var lowestDepth = Infinity;
+         var flag = GLPIImpact.DEFAULT;
+
+         compound.children().forEach(function(childNode) {
+            var childNodeDepth = childNode.data('depth');
+            if (childNodeDepth < lowestDepth) {
+               lowestDepth = childNodeDepth;
+            }
+
+            flag = flag | childNode.data('flag');
+         });
+
+         compound.data('depth', lowestDepth);
+         compound.data('flag', flag);
+      });
+
+      // Apply flag to edges so they can get the right colors
+      this.cy.edges().forEach(function(edge) {
+         var source = GLPIImpact.cy.$(GLPIImpact.makeIDSelector(edge.data('source')));
+         var target = GLPIImpact.cy.$(GLPIImpact.makeIDSelector(edge.data('target')));
+
+         edge.data('flag', source.data('flag') & target.data('flag'));
+      });
+
+      // Set start node to this.DEFAULT when all calculation are down so he is
+      // always shown
+      GLPIImpact.cy.$(GLPIImpact.makeIDSelector(GLPIImpact.startNode)).data(
+         'flag',
+         this.DEFAULT
+      );
+
+      GLPIImpact.updateStyle();
    },
 
    /**
@@ -1773,61 +1873,7 @@ var GLPIImpact = {
    toggleVisibility: function(toToggle) {
       // Update visibility setting
       GLPIImpact.directionVisibility[toToggle] = !GLPIImpact.directionVisibility[toToggle];
-      GLPIImpact.refreshVisiblity();
-   },
-
-   /**
-    * Recalculate the visibilit of every node and edges in the graph
-    */
-   refreshVisiblity: function() {
-      // Compute direction
-      var direction;
-      var forward = GLPIImpact.directionVisibility[GLPIImpact.FORWARD];
-      var backward = GLPIImpact.directionVisibility[GLPIImpact.BACKWARD];
-
-      if (forward && backward) {
-         direction = GLPIImpact.BOTH;
-      } else if (!forward && backward) {
-         direction = GLPIImpact.BACKWARD;
-      } else if (forward && !backward) {
-         direction = GLPIImpact.FORWARD;
-      } else {
-         direction = 0;
-      }
-
-      // Hide all nodes, expect if they have no link with the current asset
-      GLPIImpact.cy.nodes().filter(function(node) {
-         return !(node.neighborhood().length == 0 && !node.isParent());
-      }).data('hidden', 1);
-
-      // Show/Hide edges according to the direction
-      GLPIImpact.cy.filter("edge").forEach(function(edge) {
-         if (edge.data('flag') & direction || edge.data('flag') == 0) {
-            edge.data('hidden', 0);
-
-            // If the edge is visible, show the nodes they are connected to it
-            var sourceFilter = "node[id='" + edge.data('source') + "']";
-            var targetFilter = "node[id='" + edge.data('target') + "']";
-            GLPIImpact.cy.filter(sourceFilter + ", " + targetFilter)
-               .data("hidden", 0);
-
-         } else {
-            edge.data('hidden', 1);
-         }
-      });
-
-      // Show parent if one of their children is visible
-      GLPIImpact.cy.$("node[hidden=0]").forEach(function(node) {
-         if (!node.isOrphan()) {
-            node.parent().data("hidden", 0);
-         }
-      });
-
-      // Start node should always be visible
-      GLPIImpact.cy.filter(GLPIImpact.makeIDSelector(GLPIImpact.startNode))
-         .data("hidden", 0);
-
-      GLPIImpact.updateStyle();
+      GLPIImpact.updateFlags();
       GLPIImpact.cy.trigger("change");
    },
 
@@ -1846,68 +1892,6 @@ var GLPIImpact = {
       $(GLPIImpact.selectors.maxDepthView).html(max);
       GLPIImpact.updateStyle();
       GLPIImpact.cy.trigger("change");
-   },
-
-   /**
-    * Explore a graph in a given direction using recursion
-    *
-    * @param {Array}  exploredNodes
-    * @param {number} direction
-    * @param {string} currentNodeID
-    * @param {number} depth
-    */
-   exploreGraph: function(exploredNodes, direction, currentNodeID, depth) {
-      // Set node depth
-      var node = this.cy.filter(this.makeIDSelector(currentNodeID));
-      if (node.data('depth') == 0 || node.data('depth') > depth) {
-         node.data('depth', depth);
-      }
-
-      // If node has a parent, set it's depth too
-      if (node.isChild() && (
-         node.parent().data('depth') == 0 ||
-         node.parent().data('depth') > depth
-      )) {
-         node.parent().data('depth', depth);
-      }
-
-      depth++;
-
-      // Depending on the direction, we are looking for edge that either begin
-      // from the current node (source) or end on the current node (target)
-      var sourceOrTarget;
-
-      // The next node is the opposite of sourceOrTarget : if our node is at
-      // the start (source) then the next is at the end (target)
-      var nextNode;
-
-      switch (direction) {
-         case GLPIImpact.FORWARD:
-            sourceOrTarget = "source";
-            nextNode       = "target";
-            break;
-         case GLPIImpact.BACKWARD:
-            sourceOrTarget = "target";
-            nextNode       = "source";
-            break;
-      }
-
-      // Find the edges connected to the current node
-      this.cy.elements('edge[' + sourceOrTarget + '="' + currentNodeID + '"]')
-         .forEach(function(edge) {
-            // Get target node from computer nextNode att name
-            var targetNode = edge.data(nextNode);
-
-            // Set flag
-            edge.data("flag", direction | edge.data("flag"));
-
-            // Check we haven't go through this node yet
-            if(exploredNodes[targetNode] == undefined) {
-               exploredNodes[targetNode] = true;
-               // Go to next node
-               GLPIImpact.exploreGraph(exploredNodes, direction, targetNode, depth);
-            }
-         });
    },
 
    /**
@@ -2614,7 +2598,6 @@ var GLPIImpact = {
 
       // Update flags
       GLPIImpact.updateFlags();
-      GLPIImpact.refreshVisiblity();
 
       // Multiple deletion, set the data in eventData buffer so it can be added
       // as a simple undo/redo entry later
@@ -3142,7 +3125,7 @@ var GLPIImpact = {
 
             // Update dependencies flags according to the new link
             GLPIImpact.updateFlags();
-            GLPIImpact.refreshVisiblity();
+
             break;
 
          case GLPIImpact.EDITION_DELETE:
@@ -3281,7 +3264,7 @@ var GLPIImpact = {
                }
 
                // The node must be visible
-               if (GLPIImpact.cy.getElementById(nodeID).data('hidden')) {
+               if (!GLPIImpact.cy.getElementById(nodeID).visible()) {
                   return false;
                }
 
@@ -3298,7 +3281,7 @@ var GLPIImpact = {
                      data: {
                         id: GLPIImpact.makeID(GLPIImpact.EDGE, GLPIImpact.eventData.addEdgeStart, node),
                         source: GLPIImpact.eventData.addEdgeStart,
-                        target: node
+                        target: node,
                      }
                   }
                ]);
@@ -3536,7 +3519,7 @@ var GLPIImpact = {
     */
    searchAssets: function(itemtype, used, filter, page) {
       var hidden = GLPIImpact.cy
-         .nodes("[hidden=1], [depth > " + GLPIImpact.maxDepth + "]")
+         .nodes(GLPIImpact.getHiddenSelector())
          .filter(function(node) {
             return !node.isParent();
          })
@@ -3605,7 +3588,7 @@ var GLPIImpact = {
    getUsedAssets: function() {
       // Get used ids for this itemtype
       var used = [];
-      GLPIImpact.cy.nodes().not("[hidden=1], [depth > " + this.maxDepth + "]").forEach(function(node) {
+      GLPIImpact.cy.nodes().not(GLPIImpact.getHiddenSelector()).forEach(function(node) {
          if (node.isParent()) {
             return;
          }

@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -32,12 +32,15 @@
 
 namespace tests\units;
 
+use CommonITILActor;
 use \DbTestCase;
+use ITILFollowup as CoreITILFollowup;
+use Ticket;
+use Ticket_User;
 
 /* Test for inc/itilfollowup.class.php */
 
 class ITILFollowup extends DbTestCase {
-
    /**
     * Create a new ITILObject and return its id
     *
@@ -264,5 +267,219 @@ class ITILFollowup extends DbTestCase {
       // Reset conf
       $_SESSION['glpiset_default_tech']      = $oldConf['glpiset_default_tech'];
       $_SESSION['glpiset_default_requester'] = $oldConf['glpiset_default_requester'];
+   }
+
+   protected function testIsFromSupportAgentProvider() {
+      return [
+         [
+            // Case 1: user is not an actor of the ticket
+            "roles"    => [],
+            "expected" => true,
+         ],
+         [
+            // Case 2: user is a requester
+            "roles"    => [CommonITILActor::REQUESTER],
+            "expected" => false,
+         ],
+         [
+            // Case 3: user is an observer
+            "roles"    => [CommonITILActor::OBSERVER],
+            "expected" => false,
+         ],
+         [
+            // Case 4: user is assigned
+            "roles"    => [CommonITILActor::ASSIGN],
+            "expected" => true,
+         ],
+         [
+            // Case 5: user is observer and assigned
+            "roles"    => [
+               CommonITILActor::OBSERVER,
+               CommonITILActor::ASSIGN,
+            ],
+            "expected" => true,
+         ],
+      ];
+   }
+
+   /**
+    * @dataprovider testIsFromSupportAgentProvider
+    */
+   public function testIsFromSupportAgent(
+      array $roles,
+      bool $expected
+   ) {
+      global $CFG_GLPI, $DB;
+
+      // Disable notifications
+      $old_conf = $CFG_GLPI['use_notifications'];
+      $CFG_GLPI['use_notifications'] = false;
+
+      $this->login();
+
+      // Insert a ticket;
+      $ticket = new Ticket();
+      $ticket_id = $ticket->add([
+         "name"    => "testIsFromSupportAgent",
+         "content" => "testIsFromSupportAgent",
+      ]);
+      $this->integer($ticket_id);
+
+      // Insert a followup
+      $user1 = getItemByTypeName('User', TU_USER, true);
+      $fup = new CoreITILFollowup();
+      $fup_id = $fup->add([
+         'content'  => "testIsFromSupportAgent",
+         'users_id' => $user1,
+         'items_id' => $ticket_id,
+         'itemtype' => "Ticket",
+      ]);
+      $this->integer($fup_id);
+      $this->boolean($fup->getFromDB($fup_id))->isTrue();
+
+      // Remove any roles that may have been set after insert
+      $DB->delete(Ticket_User::getTable(), ['tickets_id' => $ticket_id]);
+      $this->array($ticket->getITILActors())->hasSize(0);
+
+      // Insert roles
+      $tuser = new Ticket_User();
+      foreach ($roles as $role) {
+         $this->integer($tuser->add([
+            'tickets_id' => $ticket_id,
+            'users_id'   => $user1,
+            'type'       => $role,
+         ]));
+      }
+
+      // Execute test
+      $result = $fup->isFromSupportAgent();
+      $this->boolean($result)->isEqualTo($expected);
+
+      // Reset conf
+      $CFG_GLPI['use_notifications'] = $old_conf;
+   }
+
+   public function testScreenshotConvertedIntoDocument() {
+      // Test uploads for item creation
+      $ticket = new \Ticket();
+      $ticket->add([
+         'name' => $this->getUniqueString(),
+         'content' => 'test',
+      ]);
+      $this->boolean($ticket->isNewItem())->isFalse();
+
+      $base64Image = base64_encode(file_get_contents(__DIR__ . '/../fixtures/uploads/foo.png'));
+      $user = getItemByTypeName('User', TU_USER, true);
+      $filename = '5e5e92ffd9bd91.11111111image_paste22222222.png';
+      $instance = new \ITILFollowup();
+      $input = [
+         'users_id' => $user,
+         'items_id' => $ticket->getID(),
+         'itemtype' => 'Ticket',
+         'name'    => 'a followup',
+         'content' => '&lt;p&gt; &lt;/p&gt;&lt;p&gt;&lt;img id="3e29dffe-0237ea21-5e5e7034b1d1a1.00000000"'
+         . ' src="data:image/png;base64,' . $base64Image . '" width="12" height="12" /&gt;&lt;/p&gt;',
+         '_content' => [
+            $filename,
+         ],
+         '_tag_content' => [
+            '3e29dffe-0237ea21-5e5e7034b1d1a1.00000000',
+         ],
+         '_prefix_content' => [
+            '5e5e92ffd9bd91.11111111',
+         ]
+      ];
+      copy(__DIR__ . '/../fixtures/uploads/foo.png', GLPI_TMP_DIR . '/' . $filename);
+
+      $instance->add($input);
+      $this->boolean($instance->isNewItem())->isFalse();
+      $expected = 'a href=&quot;/front/document.send.php?docid=';
+      $this->string($instance->fields['content'])->contains($expected);
+
+      // Test uploads for item update
+      $base64Image = base64_encode(file_get_contents(__DIR__ . '/../fixtures/uploads/bar.png'));
+      $filename = '5e5e92ffd9bd91.44444444image_paste55555555.png';
+      copy(__DIR__ . '/../fixtures/uploads/bar.png', GLPI_TMP_DIR . '/' . $filename);
+      $success = $instance->update([
+         'id' => $instance->getID(),
+         'content' => '&lt;p&gt; &lt;/p&gt;&lt;p&gt;&lt;img id="3e29dffe-0237ea21-5e5e7034b1d1a1.33333333"'
+         . ' src="data:image/png;base64,' . $base64Image . '" width="12" height="12" /&gt;&lt;/p&gt;',
+         '_content' => [
+            $filename,
+         ],
+         '_tag_content' => [
+            '3e29dffe-0237ea21-5e5e7034b1d1a1.33333333',
+         ],
+         '_prefix_content' => [
+            '5e5e92ffd9bd91.44444444',
+         ]
+      ]);
+      $this->boolean($success)->isTrue();
+      $expected = 'a href=&quot;/front/document.send.php?docid=';
+      $this->string($instance->fields['content'])->contains($expected);
+   }
+
+   public function testUploadDocuments() {
+      // Test uploads for item creation
+      $ticket = new \Ticket();
+      $ticket->add([
+         'name' => $this->getUniqueString(),
+         'content' => 'test',
+      ]);
+      $this->boolean($ticket->isNewItem())->isFalse();
+
+      $user = getItemByTypeName('User', TU_USER, true);
+      // Test uploads for item creation
+      $filename = '5e5e92ffd9bd91.11111111' . 'foo.txt';
+      $instance = new \ITILFollowup();
+      $input = [
+         'users_id' => $user,
+         'items_id' => $ticket->getID(),
+         'itemtype' => 'Ticket',
+         'name'    => 'a followup',
+         'content' => 'testUploadDocuments',
+         '_filename' => [
+            $filename,
+         ],
+         '_tag_filename' => [
+            '3e29dffe-0237ea21-5e5e7034b1ffff.00000000',
+         ],
+         '_prefix_filename' => [
+            '5e5e92ffd9bd91.11111111',
+         ]
+      ];
+      copy(__DIR__ . '/../fixtures/uploads/foo.txt', GLPI_TMP_DIR . '/' . $filename);
+      $instance->add($input);
+      $this->boolean($instance->isNewItem())->isFalse();
+      $this->string($instance->fields['content'])->contains('testUploadDocuments');
+      $count = (new \DBUtils())->countElementsInTable(\Document_Item::getTable(), [
+         'itemtype' => 'ITILFollowup',
+         'items_id' => $instance->getID(),
+      ]);
+      $this->integer($count)->isEqualTo(1);
+
+      // Test uploads for item update (adds a 2nd document)
+      $filename = '5e5e92ffd9bd91.44444444bar.txt';
+      copy(__DIR__ . '/../fixtures/uploads/bar.png', GLPI_TMP_DIR . '/' . $filename);
+      $success = $instance->update([
+         'id' => $instance->getID(),
+         'content' => 'update testUploadDocuments',
+         '_filename' => [
+            $filename,
+         ],
+         '_tag_filename' => [
+            '3e29dffe-0237ea21-5e5e7034b1ffff.33333333',
+         ],
+         '_prefix_filename' => [
+            '5e5e92ffd9bd91.44444444',
+         ]
+      ]);
+      $this->boolean($success)->isTrue();
+      $this->string($instance->fields['content'])->contains('update testUploadDocuments');
+      $count = (new \DBUtils())->countElementsInTable(\Document_Item::getTable(), [
+         'itemtype' => 'ITILFollowup',
+         'items_id' => $instance->getID(),
+      ]);
+      $this->integer($count)->isEqualTo(2);
    }
 }

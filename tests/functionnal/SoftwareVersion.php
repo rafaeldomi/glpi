@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -30,46 +30,20 @@
  * ---------------------------------------------------------------------
  */
 
-if (!defined('GLPI_ROOT')) {
-   die("Sorry. You can't access this file directly");
-}
+namespace tests\units;
 
-/**
- * Backup class
- *
- * @since 0.85
-**/
+use DbTestCase;
+use SoftwareVersion as CoreSoftwareVersion;
 
+/* Test for inc/softwareversion.class.php */
 
-class Backup extends CommonGLPI {
+class SoftwareVersion extends DbTestCase {
 
-   static $rightname = 'backup';
-
-   const CHECKUPDATE = 1024;
-
-
-   static function getTypeName($nb = 0) {
-      return __('Maintenance');
+   public function testDropdownForOneSoftware() {
+      $this
+         ->string(CoreSoftwareVersion::dropdownForOneSoftware([
+            "display" => false
+         ]))
+         ->isNotEmpty();
    }
-
-
-   /**
-    * @since 0.85
-    *
-    * @see commonDBTM::getRights()
-   **/
-   function getRights($interface = 'central') {
-
-      $values = [READ                => __('Read'),
-                      CREATE              => __('Create'),
-                      PURGE               => _x('button', 'Delete permanently'),
-                      self::CHECKUPDATE   => __('Check for upgrade')];
-      return $values;
-   }
-
-
-   static function getIcon() {
-      return "fas fa-wrench";
-   }
-
 }

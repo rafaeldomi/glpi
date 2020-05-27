@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -177,6 +177,7 @@ class Group extends CommonTreeDropdown {
       $ong = [];
 
       $this->addDefaultFormTab($ong);
+      $this->addImpactTab($ong, $options);
       $this->addStandardTab('Group', $ong, $options);
       if (isset($this->fields['is_usergroup'])
           && $this->fields['is_usergroup']) {

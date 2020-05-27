@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -108,13 +108,13 @@ if (isset($_POST["add"])) {
               sprintf(__('%s adds an actor'), $_SESSION["glpiname"]));
    Html::redirect($problem->getFormURLWithID($_POST['problems_id']));
 } else if (isset($_REQUEST['delete_document'])) {
+   $problem->getFromDB((int)$_REQUEST['problems_id']);
    $doc = new Document();
    $doc->getFromDB(intval($_REQUEST['documents_id']));
    if ($doc->can($doc->getID(), UPDATE)) {
       $document_item = new Document_Item;
       $found_document_items = $document_item->find([
-         'itemtype'     => 'Problem',
-         'items_id'     => (int)$_REQUEST['problems_id'],
+         $problem->getAssociatedDocumentsCriteria(),
          'documents_id' => $doc->getID()
       ]);
       foreach ($found_document_items  as $item) {

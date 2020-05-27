@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -917,6 +917,7 @@ class Dropdown {
                                              Session::getPluralNumber()),
                  'RackType'             => RackType::getTypeName(Session::getPluralNumber()),
                  'PDUType'              => PDUType::getTypeName(Session::getPluralNumber()),
+                 'PassiveDCEquipmentType' => PassiveDCEquipmentType::getTypeName(Session::getPluralNumber()),
                  'ClusterType'          => ClusterType::getTypeName(Session::getPluralNumber()),
              ],
 
@@ -971,6 +972,7 @@ class Dropdown {
                   'RackModel'                => RackModel::getTypeName(Session::getPluralNumber()),
                   'EnclosureModel'           => EnclosureModel::getTypeName(Session::getPluralNumber()),
                   'PDUModel'                 => PDUModel::getTypeName(Session::getPluralNumber()),
+                  'PassiveDCEquipmentModel'  => PassiveDCEquipmentModel::getTypeName(Session::getPluralNumber()),
              ],
 
              _n('Virtual machine', 'Virtual machines', Session::getPluralNumber()) => [
@@ -1052,7 +1054,8 @@ class Dropdown {
                  'LineOperator'             => _n('Line operator', 'Line operators',
                                                   Session::getPluralNumber()),
                  'DomainType'               => DomainType::getTypeName(Session::getPluralNumber()),
-                 'DomainRelation'           => DomainRelation::getTypeName(Session::getPluralNumber())
+                 'DomainRelation'           => DomainRelation::getTypeName(Session::getPluralNumber()),
+                 'DomainRecordType'         => DomainRecordType::getTypeName(Session::getPluralNumber())
              ],
 
              __('Internet') => [
@@ -1097,7 +1100,11 @@ class Dropdown {
              ],
              __('Power management') => [
                'Plug'=> Plug::getTypeName(Session::getPluralNumber())
-             ]
+             ],
+             __('Appliances') => [
+                'ApplianceType'  => ApplianceType::getTypeName(Session::getPluralNumber()),
+                'ApplianceEnvironment' => ApplianceEnvironment::getTypeName(Session::getPluralNumber())
+             ],
 
          ]; //end $opt
 
@@ -3244,8 +3251,10 @@ class Dropdown {
       // If software or plugins : filter to display only the objects that are allowed to be visible in Helpdesk
       $filterHelpdesk = in_array($post['itemtype'], $CFG_GLPI["helpdesk_visible_types"]);
 
-      if (isset($post['context']) && $post['context'] == "impact"
-          && isset($CFG_GLPI['impact_asset_types'][$post['itemtype']])) {
+      if (isset($post['context'])
+         && $post['context'] == "impact"
+         && Impact::isEnabled($post['itemtype'])
+      ) {
          $filterHelpdesk = false;
       }
 

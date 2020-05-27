@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -77,7 +77,7 @@ switch ($_REQUEST['action']) {
       exit;
 
    case 'clone_dashboard':
-      $new_dashboard = $dashboard->clone();
+      $new_dashboard = $dashboard->cloneCurrent();
       echo json_encode($new_dashboard);
       exit;
 }

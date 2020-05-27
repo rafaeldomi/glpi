@@ -1,7 +1,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -448,19 +448,19 @@ select {
    border: 1px solid #bbb;
 }
 
-textarea, input:not(.submit):not([type=submit]):not([type=reset]):not([type=checkbox]):not([type=radio]):not(.select2-search__field) {
+textarea, input:not(.submit):not([type=submit]):not([type=reset]):not([type=checkbox]):not([type=radio]):not(.select2-search__field):not(.numInput) {
    border: 1px solid #D3D3D3;
    font-size: 11px;
    border-radius: 3px;
    padding: 0 5px;
 }
 
-textarea:not([disabled]), input:not(.submit):not([type=submit]):not([type=reset]):not([type=checkbox]):not([type=radio]):not(.select2-search__field):not([disabled]) {
+textarea:not([disabled]), input:not(.submit):not([type=submit]):not([type=reset]):not([type=checkbox]):not([type=radio]):not(.select2-search__field):not(.numInput):not([disabled]) {
    background-color: #FCFCFC;
    color: black;
 }
 
-textarea:focus, input:not([type=submit]):not([type=reset]):not([type=checkbox]):not([type=radio]):not(.select2-search__field):focus {
+textarea:focus, input:not([type=submit]):not([type=reset]):not([type=checkbox]):not([type=radio]):not(.select2-search__field):not(.numInput):focus {
    border-color: #5897fb;
 }
 
@@ -491,6 +491,11 @@ input {
 
 input:required:valid {
    border: 1px solid rgb(211, 211, 211) !important;
+}
+
+input:not(.submit):not([type=submit]):not([type=reset]):not([type=checkbox]):not([type=radio]):not(.select2-search__field)[type=color] {
+   padding: 0;
+   width: 3em;
 }
 
 span.required {
@@ -2580,6 +2585,10 @@ a.icon_nav_move {
    .fc-divider {
       border: 1px dashed #cccccc;
    }
+
+   .fc-list-empty-wrap2 {
+      position: initial;
+   }
 }
 
 /* for checkavailable */
@@ -3172,6 +3181,10 @@ ul#menu {
       min-width: 135px;
       z-index: 500;
    }
+
+   .empty-icon::before {
+      content: "";
+   }
 }
 
 #header #c_logo {
@@ -3621,6 +3634,7 @@ a.copyright {
       min-width: 90px;
       text-align: center;
       padding: .5em .5em;
+      margin-top: 5px;
       margin-right: 3%;
       cursor: pointer;
       font-weight: bold;
@@ -3672,6 +3686,22 @@ a.copyright {
 }
 
 /** TIMELINE **/
+.timeline_stats {
+   opacity: 0.2;
+   text-align: right;
+   margin-top: 0.2em;
+
+   &:hover {
+      opacity: 1;
+   }
+
+   h3 {
+      font-weight: bold;
+      font-size: 1em;
+      margin: 0 .5em 0 0;
+      padding: 0;
+   }
+}
 
 .timeline_history {
    border-top: 1px dashed #3C5874;
@@ -6453,6 +6483,9 @@ with incorrect shading in some cases */
    color: green !important;
 }
 
+input:disabled + .label-checkbox {
+   cursor: not-allowed;
+}
 /** Custom CSS form */
 .custom_css_configuration td:not([colspan]) {
    width: 50%;
@@ -6557,7 +6590,6 @@ div.objectlockmessage > .form-group-checkbox {
       }
    }
    .kanban-form {
-      position: absolute;
       text-align: left;
       padding: 10px 10px 10px 10px;
       background-color: white;
@@ -6779,7 +6811,7 @@ div.objectlockmessage > .form-group-checkbox {
                   margin-top: 5px;
                   border-radius: 5px;
                   border: #d3d3d3 1px solid;
-                  width: 250px;
+                  min-width: 250px;
                   &.filtered-out {
                      display: none;
                   }

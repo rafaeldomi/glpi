@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -456,7 +456,7 @@ class Search {
       }
 
       if (count($p['criteria']) > 0) {
-         // use a recursive clojure to push searchoption when using nested criteria
+         // use a recursive closure to push searchoption when using nested criteria
          $parse_criteria = function($criteria) use (&$parse_criteria, &$data) {
             foreach ($criteria as $criterion) {
                // recursive call
@@ -486,7 +486,7 @@ class Search {
             }
          };
 
-         // call the clojure
+         // call the closure
          $parse_criteria($p['criteria']);
       }
 
@@ -897,6 +897,8 @@ class Search {
                                           $replace, $tmpquery);
                   $tmpquery = str_replace($CFG_GLPI["union_search_type"][$data['itemtype']],
                                           $ctable, $tmpquery);
+                  $name_field = $ctype::getNameField();
+                  $tmpquery = str_replace("`$ctable`.`name`", "`$ctable`.`$name_field`", $tmpquery);
                }
                $tmpquery = str_replace("ENTITYRESTRICT",
                                        getEntitiesRestrictRequest('', $ctable, '', '',
@@ -3102,6 +3104,10 @@ JAVASCRIPT;
          }
       }
 
+      if (in_array($searchtype, ["notequals", "notcontains"])) {
+         $NOT = !$NOT;
+      }
+
       // Preformat items
       if (isset($searchopt[$ID]["datatype"])) {
          switch ($searchopt[$ID]["datatype"]) {
@@ -3173,10 +3179,6 @@ JAVASCRIPT;
                }
                break;
          }
-      }
-
-      if ($searchtype == "notcontains") {
-         $NOT = !$NOT;
       }
 
       return self::makeTextCriteria("`$NAME`", $val, $NOT, $LINK);
@@ -3325,8 +3327,11 @@ JAVASCRIPT;
 
       $toview = [];
       $item   = null;
+      $entity_check = true;
+
       if ($itemtype != 'AllAssets') {
          $item = getItemForItemtype($itemtype);
+         $entity_check = $item->isEntityAssign();
       }
       // Add first element (name)
       array_push($toview, 1);
@@ -3338,7 +3343,7 @@ JAVASCRIPT;
 
       // Add entity view :
       if (Session::isMultiEntitiesMode()
-          && $item->isEntityAssign()
+          && $entity_check
           && (isset($CFG_GLPI["union_search_type"][$itemtype])
               || ($item && $item->maybeRecursive())
               || isset($_SESSION['glpiactiveentities']) && (count($_SESSION["glpiactiveentities"]) > 1))) {
@@ -3356,6 +3361,7 @@ JAVASCRIPT;
     * @return select string
    **/
    static function addDefaultSelect($itemtype) {
+      global $DB;
 
       $itemtable = getTableForItemType($itemtype);
       $item      = null;
@@ -3384,7 +3390,12 @@ JAVASCRIPT;
       if ($itemtable == 'glpi_entities') {
          $ret .= "`$itemtable`.`id` AS entities_id, '1' AS is_recursive, ";
       } else if ($mayberecursive) {
-         $ret .= "`$itemtable`.`entities_id`, `$itemtable`.`is_recursive`, ";
+         $ret .= $DB->quoteName("$itemtable.entities_id").", ";
+         //do not include field if not present in table
+         $item->getEmpty();
+         if (isset($item->fields['is_recursive'])) {
+            $ret .= $DB->quoteName("$itemtable.is_recursive").", ";
+         }
       }
       return $ret;
    }
@@ -3626,14 +3637,18 @@ JAVASCRIPT;
          case "glpi_itilfollowups.content":
          case "glpi_tickettasks.content":
          case "glpi_changetasks.content":
+            if (is_subclass_of($itemtype, "CommonITILObject")) {
                // force ordering by date desc
-               return " GROUP_CONCAT(DISTINCT CONCAT(IFNULL($tocompute, '".self::NULLVALUE."'),
-                                               '".self::SHORTSEP."',$tocomputeid)
-                                     ORDER BY `$table$addtable`.`date` DESC
-                                     SEPARATOR '".self::LONGSEP."')
-                                    AS `".$NAME."`,
-
-                       $ADDITONALFIELDS";
+               return " GROUP_CONCAT(
+                  DISTINCT CONCAT(
+                     IFNULL($tocompute, '".self::NULLVALUE."'),
+                     '".self::SHORTSEP."',
+                     $tocomputeid
+                  )
+                  ORDER BY `$table$addtable`.`date` DESC
+                  SEPARATOR '".self::LONGSEP."'
+               ) AS `".$NAME."`, $ADDITONALFIELDS";
+            }
             break;
 
          default:
@@ -4110,11 +4125,10 @@ JAVASCRIPT;
             case "date" :
             case "date_delay" :
                $force_day = true;
-               if ($searchopt[$ID]["datatype"] == 'datetime') {
+               if ($searchopt[$ID]["datatype"] == 'datetime'
+                  && !(strstr($val, 'BEGIN') || strstr($val, 'LAST') || strstr($val, 'DAY'))
+               ) {
                   $force_day = false;
-               }
-               if (strstr($val, 'BEGIN') || strstr($val, 'LAST')) {
-                  $force_day = true;
                }
 
                $val = Html::computeGenericDateTimeSearch($val, $force_day);
@@ -4580,9 +4594,6 @@ JAVASCRIPT;
                      $val = 1;
                   }
                }
-               if ($searchtype == 'notequals') {
-                  $nott = !$nott;
-               }
                // No break here : use number comparaison case
 
             case "count" :
@@ -4594,6 +4605,9 @@ JAVASCRIPT;
                $val     = preg_replace($search, $replace, $val);
 
                if (preg_match("/([<>])([=]*)[[:space:]]*([0-9]+)/", $val, $regs)) {
+                  if (in_array($searchtype, ["notequals", "notcontains"])) {
+                     $nott = !$nott;
+                  }
                   if ($nott) {
                      if ($regs[1] == '<') {
                         $regs[1] = '>';
@@ -4604,8 +4618,13 @@ JAVASCRIPT;
                   $regs[1] .= $regs[2];
                   return $link." ($tocompute ".$regs[1]." ".$regs[3].") ";
                }
+
                if (is_numeric($val)) {
                   $numeric_val = floatval($val);
+
+                  if (in_array($searchtype, ["notequals", "notcontains"])) {
+                     $nott = !$nott;
+                  }
 
                   if (isset($searchopt[$ID]["width"])) {
                      $ADD = "";
@@ -5497,6 +5516,14 @@ JAVASCRIPT;
 
          switch ($table.'.'.$field) {
             case "glpi_users.name" :
+               if ($itemtype == 'Ticket'
+                  && Entity::getUsedConfig('anonymize_support_agents')
+                  && Session::getCurrentInterface() == 'helpdesk'
+                  && $orig_id == 5) {
+                  // Support agent
+                  return __("Helpdesk");
+               }
+
                // USER search case
                if (($itemtype != 'User')
                    && isset($so["forcegroupby"]) && $so["forcegroupby"]) {
@@ -5538,6 +5565,7 @@ JAVASCRIPT;
                         // Manage alternative_email for tickets_users
                         if (($itemtype == 'Ticket')
                             && isset($data[$ID][$k][2])) {
+
                            $split = explode(self::LONGSEP, $data[$ID][$k][2]);
                            for ($l=0; $l<count($split); $l++) {
                               $split2 = explode(" ", $split[$l]);
@@ -6131,6 +6159,14 @@ JAVASCRIPT;
       }
 
       //// Default case
+
+      if ($itemtype == 'Ticket'
+         && Entity::getUsedConfig('anonymize_support_agents')
+         && Session::getCurrentInterface() == 'helpdesk'
+         && $orig_id == 8) {
+         // Assigned groups
+         return __("Helpdesk group");
+      }
 
       // Link with plugin tables : need to know left join structure
       if (isset($table)) {
@@ -7046,6 +7082,12 @@ JAVASCRIPT;
                       && !isset($searchopt[$field_num]['max'])) {
                      unset($opt['equals']);
                      unset($opt['notequals']);
+
+                     // https://github.com/glpi-project/glpi/issues/6917
+                     // change filter wording for numeric values to be more
+                     // obvious if the number dropdown will not be used
+                     $opt['contains']    = __('is');
+                     $opt['notcontains'] = __('is not');
                   }
                   return $opt;
 
@@ -7710,6 +7752,11 @@ JAVASCRIPT;
             ($matches[1] != '^' ? '%' : '') .
             trim($matches[2]) .
             ($matches[3] != '$' ? '%' : '');
+      } else if (isset($matches[1])
+            && strlen(trim($matches[1])) == 1
+            && (!isset($matches[3]) || empty($matches[3]))) {
+         // this case is for search with only ^, so mean the field is not empty / not null
+         $search = '%';
       }
       return $search;
    }

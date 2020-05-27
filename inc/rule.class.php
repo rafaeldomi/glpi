@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -2396,7 +2396,7 @@ class Rule extends CommonDBTM {
 
          switch ($action['type']) {
             case "dropdown" :
-               if ($type=='fromuser' || $type=='fromitem') {
+               if ($type=='defaultfromuser' || $type=='fromuser' || $type=='fromitem') {
                   return Dropdown::getYesNo($value);
                }
                // $type == assign
@@ -3172,6 +3172,13 @@ class Rule extends CommonDBTM {
       echo "</div>";
    }
 
+   public static function canCreate() {
+      return static::canUpdate();
+   }
+
+   public static function canPurge() {
+      return static::canUpdate();
+   }
 
    static function getIcon() {
       return "fas fa-book";

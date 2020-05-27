@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -328,6 +328,7 @@ class Html extends \GLPITestCase {
          'Rack',
          'Enclosure',
          'PDU',
+         'PassiveDCEquipment',
          'Item_DeviceSimcard'
       ];
       $this->string($menu['assets']['title'])->isIdenticalTo('Assets');
@@ -355,7 +356,8 @@ class Html extends \GLPITestCase {
          'Certificate',
          'Datacenter',
          'Cluster',
-         'Domain'
+         'Domain',
+         'Appliance'
       ];
       $this->string($menu['management']['title'])->isIdenticalTo('Management');
       $this->array($menu['management']['types'])->isIdenticalTo($expected);
@@ -385,7 +387,6 @@ class Html extends \GLPITestCase {
          'Rule',
          'Profile',
          'QueuedNotification',
-         'Backup',
          'Glpi\\Event'
       ];
       $this->string($menu['admin']['title'])->isIdenticalTo('Administration');

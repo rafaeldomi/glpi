@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -47,6 +47,11 @@ class State extends CommonTreeDropdown {
 
    static function getTypeName($nb = 0) {
       return _n('Status of items', 'Statuses of items', $nb);
+   }
+
+
+   static function getFieldLabel() {
+      return __('Status');
    }
 
 
@@ -396,6 +401,24 @@ class State extends CommonTreeDropdown {
          'field'              => 'is_visible_cluster',
          'name'               => sprintf(__('%1$s - %2$s'), __('Visibility'),
                                      Cluster::getTypeName(Session::getPluralNumber())),
+         'datatype'           => 'bool'
+      ];
+
+      $tab[] = [
+         'id'                 => '35',
+         'table'              => $this->getTable(),
+         'field'              => 'is_visible_passivedcequipment',
+         'name'               => sprintf(__('%1$s - %2$s'), __('Visibility'),
+                                     PassiveDCEquipment::getTypeName(Session::getPluralNumber())),
+         'datatype'           => 'bool'
+      ];
+
+      $tab[] = [
+         'id'                 => '36',
+         'table'              => $this->getTable(),
+         'field'              => 'is_visible_contract',
+         'name'               => sprintf(__('%1$s - %2$s'), __('Visibility'),
+                                    Contract::getTypeName(Session::getPluralNumber())),
          'datatype'           => 'bool'
       ];
 

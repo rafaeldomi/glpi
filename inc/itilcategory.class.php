@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -44,8 +44,6 @@ class ITILCategory extends CommonTreeDropdown {
    public $can_be_translated  = true;
 
    static $rightname          = 'itilcategory';
-
-
 
    function getAdditionalFields() {
 

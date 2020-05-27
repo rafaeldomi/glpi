@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -47,11 +47,10 @@ class DisableMaintenanceModeCommand extends AbstractCommand {
    protected function configure() {
       parent::configure();
 
-      $this->setName('glpi:maintenance:disable_maintenance_mode');
+      $this->setName('glpi:maintenance:disable');
       $this->setAliases(
          [
-            'glpi:maintenance:off',
-            'maintenance:off',
+            'maintenance:disable',
          ]
       );
       $this->setDescription(__('Disable maintenance mode'));

@@ -2,7 +2,7 @@
 /**
  * ---------------------------------------------------------------------
  * GLPI - Gestionnaire Libre de Parc Informatique
- * Copyright (C) 2015-2018 Teclib' and contributors.
+ * Copyright (C) 2015-2020 Teclib' and contributors.
  *
  * http://glpi-project.org
  *
@@ -38,7 +38,7 @@ abstract class APIBaseClass extends \atoum {
 
    abstract protected function query($resource = "",
                                      $params = [],
-                                     $expected_code = 200);
+                                     $expected_codes = 200);
 
    public function beforeTestMethod($method) {
       parent::beforeTestMethod($method);
@@ -88,8 +88,8 @@ abstract class APIBaseClass extends \atoum {
          (int)$apiclient->add([
             'name'             => 'test app token',
             'is_active'        => 1,
-            'ipv4_range_start' => 2130706433,
-            'ipv4_range_end'   => 2130706433,
+            'ipv4_range_start' => '127.0.0.1',
+            'ipv4_range_end'   => '127.0.0.1',
             '_reset_app_token' => true,
          ])
       )->isGreaterThan(0);
@@ -1300,6 +1300,40 @@ abstract class APIBaseClass extends \atoum {
          ->hasKey('cfg_glpi');
       $this->array($data['cfg_glpi'])
          ->hasKey('infocom_types');
+   }
+
+
+   public function testUndisclosedField() {
+      // test common cases
+      $itemtypes = [
+         'APIClient', 'AuthLDAP', 'MailCollector', 'User'
+      ];
+      foreach ($itemtypes as $itemtype) {
+         $data = $this->query(
+            'getItems',
+            [
+               'itemtype' => $itemtype,
+               'headers'  => ['Session-Token' => $this->session_token]
+            ]
+         );
+
+         $this->array($itemtype::$undisclosedFields)
+            ->size->isGreaterThan(0);
+
+         foreach ($itemtype::$undisclosedFields as $key) {
+            $this->array($data);
+            unset($data['headers']);
+            foreach ($data as $item) {
+               $this->array($item)->notHasKey($key);
+            }
+         }
+      }
+
+      // test specific cases
+      // Config
+      $data = $this->query('getGlpiConfig', [
+         'headers'  => ['Session-Token' => $this->session_token]
+      ]);
 
       // Test undisclosed data are actually not disclosed
       $this->array(Config::$undisclosedFields)
